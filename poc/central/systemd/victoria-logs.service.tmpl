@@ -1,0 +1,19 @@
+[Unit]
+Description=@NAME@ VictoriaLogs (로그 저장)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=@USER@
+Group=@GROUP@
+EnvironmentFile=@CONF@/env
+ExecStart=@BIN@/victoria-logs-prod -httpListenAddr=127.0.0.1:9428 -storageDataPath=@DATA@/victoria-logs -retentionPeriod=${RETENTION}
+Restart=always
+RestartSec=3
+LimitNOFILE=1048576
+
+StandardOutput=append:@LOGS@/victoria-logs.log
+StandardError=append:@LOGS@/victoria-logs.log
+
+[Install]
+WantedBy=multi-user.target

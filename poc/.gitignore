@@ -1,2 +1,3 @@
 dist/
 inventory.env
+secrets/

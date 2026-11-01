@@ -1,0 +1,19 @@
+[Unit]
+Description=@NAME@ vlagent (로그 중계, 양쪽 저장소에 복제)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=@USER@
+Group=@GROUP@
+EnvironmentFile=@CONF@/env
+ExecStart=@BIN@/vlagent-prod -httpListenAddr=127.0.0.1:9429 -remoteWrite.url=http://127.0.0.1:9428/insert/native $VL_PEER_ARGS -remoteWrite.tmpDataPath=@DATA@/vlagent-queue -remoteWrite.maxDiskUsagePerURL=${QUEUE_MAX}
+Restart=always
+RestartSec=3
+LimitNOFILE=1048576
+
+StandardOutput=append:@LOGS@/vlagent.log
+StandardError=append:@LOGS@/vlagent.log
+
+[Install]
+WantedBy=multi-user.target

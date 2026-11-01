@@ -1,0 +1,19 @@
+[Unit]
+Description=@NAME@ Alertmanager (알림 중복 제거, 클러스터)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=@USER@
+Group=@GROUP@
+EnvironmentFile=@CONF@/env
+ExecStart=@BIN@/alertmanager --config.file=@CONF@/alertmanager.yml --storage.path=@DATA@/alertmanager --web.listen-address=127.0.0.1:9093 $AM_CLUSTER_ARGS
+Restart=always
+RestartSec=3
+LimitNOFILE=1048576
+
+StandardOutput=append:@LOGS@/alertmanager.log
+StandardError=append:@LOGS@/alertmanager.log
+
+[Install]
+WantedBy=multi-user.target

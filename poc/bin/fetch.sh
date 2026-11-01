@@ -24,7 +24,6 @@ gh_dl VictoriaMetrics/VictoriaTraces "$VT_VERSION" "vtutils-linux-amd64-${VT_VER
 gh_dl prometheus/alertmanager "v$AM_VERSION" "alertmanager-$AM_VERSION.linux-amd64.tar.gz"
 gh_dl prometheus/alertmanager "v$AM_VERSION" "sha256sums.txt"
 mv -f dist/sha256sums.txt dist/alertmanager-sha256sums.txt 2>/dev/null || true
-[ -s "dist/$HAPROXY_RPM" ] || curl -fsSL --retry 3 -o "dist/$HAPROXY_RPM" "$ROCKY_APPSTREAM/h/$HAPROXY_RPM"
 
 # 체크섬 확인 (Victoria 는 *_checksums.txt, Alertmanager 는 sha256sums.txt)
 ( cd dist

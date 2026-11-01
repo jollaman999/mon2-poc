@@ -1,0 +1,19 @@
+[Unit]
+Description=@NAME@ VictoriaTraces (트레이스 저장)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=@USER@
+Group=@GROUP@
+EnvironmentFile=@CONF@/env
+ExecStart=@BIN@/victoria-traces-prod -httpListenAddr=127.0.0.1:10428 -storageDataPath=@DATA@/victoria-traces -retentionPeriod=${RETENTION}
+Restart=always
+RestartSec=3
+LimitNOFILE=1048576
+
+StandardOutput=append:@LOGS@/victoria-traces.log
+StandardError=append:@LOGS@/victoria-traces.log
+
+[Install]
+WantedBy=multi-user.target

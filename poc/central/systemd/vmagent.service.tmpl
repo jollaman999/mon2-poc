@@ -1,0 +1,19 @@
+[Unit]
+Description=@NAME@ vmagent (메트릭 중계, 양쪽 저장소에 복제)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=@USER@
+Group=@GROUP@
+EnvironmentFile=@CONF@/env
+ExecStart=@BIN@/vmagent-prod -httpListenAddr=127.0.0.1:8429 -remoteWrite.url=http://127.0.0.1:8428/api/v1/write $VM_PEER_ARGS -remoteWrite.tmpDataPath=@DATA@/vmagent-queue -remoteWrite.maxDiskUsagePerURL=${QUEUE_MAX} -opentelemetry.usePrometheusNaming -promscrape.config=@CONF@/scrape.yml
+Restart=always
+RestartSec=3
+LimitNOFILE=1048576
+
+StandardOutput=append:@LOGS@/vmagent.log
+StandardError=append:@LOGS@/vmagent.log
+
+[Install]
+WantedBy=multi-user.target
