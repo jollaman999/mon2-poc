@@ -4,11 +4,11 @@
 
 ## 한 장 요약
 
-![목표 구조](figures/04-target.png)
+![목표 구조](figures/04-target.svg)
 
 **노드 안 · 노드 사이 상세 흐름** (포트 · 경로 · 복제 방향, 5.1절에서 설명)
 
-![노드 사이 상세 구조](figures/20-node-detail.png)
+![노드 사이 상세 구조](figures/20-node-detail.svg)
 
 | 질문 | 답 |
 |---|---|
@@ -68,7 +68,7 @@
 
 ### 3.1 양쪽 저장소를 같게 유지하는 방법
 
-![동기화 방법 비교](figures/03-sync-options.png)
+![동기화 방법 비교](figures/03-sync-options.svg)
 
 | 방법 | 어떻게 동작하나 | 얻는 것 | 잃는 것 |
 |---|---|---|---|
@@ -108,7 +108,7 @@
 
 ### 3.3 진입점 이중화 - L2 VIP 대신 L3
 
-![L2 VIP 대신 L3](figures/14-l3-ha.png)
+![L2 VIP 대신 L3](figures/14-l3-ha.svg)
 
 **질문**: keepalived VIP 는 VRRP 라 L2 에서만 동작한다. OpenStack 은 라우터 · 포트 설정을, VMware 는 포트그룹 정책을 따로 봐야 한다. HAProxy 로 L3 까지 고려한 이중화가 되나?
 
@@ -135,7 +135,7 @@
 
 ### 3.4 중계 - OTel Collector 가 아니라 Victoria 에이전트
 
-![중계기 선택](figures/18-relay-choice.png)
+![중계기 선택](figures/18-relay-choice.svg)
 
 에이전트가 OTel 이니 중계도 OTel Collector 게이트웨이(중앙에 둔 Collector 가 exporter 2개로 양쪽에 보내는 구성)로 하는 길이 있다. **이 길도 된다.** OTel Collector 도 exporter 마다 `file_storage` 큐를 붙이면 재시작해도 남는 목적지별 큐가 생긴다. 그래도 Victoria 에이전트를 고른 이유는 아래다.
 
@@ -160,7 +160,7 @@
 
 ### 3.5 각 서버에 깔 에이전트 - OCB 커스텀 OTel Collector
 
-![에이전트 후보](figures/08-agent-options.png)
+![에이전트 후보](figures/08-agent-options.svg)
 
 | 후보 | 판단 |
 |---|---|
@@ -180,7 +180,7 @@
 
 ### 3.6 AI 반도체 수집 - exporter 컨테이너 없이
 
-![AI 반도체 수집 경로](figures/10-accelerator.png)
+![AI 반도체 수집 경로](figures/10-accelerator.svg)
 
 **질문 1**: 여러 관점에서 보면 dcgm-exporter 보다 nvidia-smi · GPM 을 직접 걷는 것이 낫지 않나?
 
@@ -224,7 +224,7 @@
 
 ### 3.8 알림 - Victoria 계열로
 
-![알림 - Grafana 대신 vmalert](figures/16-alerting.png)
+![알림 - Grafana 대신 vmalert](figures/16-alerting.svg)
 
 **Grafana 를 쓰지 않는 이유**
 - 알림을 Grafana 로 평가하면 관리 서버가 조직 · 폴더 · contact point · 정책 · 규칙을 Grafana API 로 맞춰야 하고, 2노드면 Grafana 도 2대라 규칙 동기화가 또 필요하다.
@@ -265,7 +265,7 @@
 
 ## 4. Victoria 중계 에이전트는 어떻게 동작하나
 
-![Victoria 중계 3종](figures/15-relays.png)
+![Victoria 중계 3종](figures/15-relays.svg)
 
 세 가지가 같은 모양이다. **받아서 → (가공) → 목적지마다 디스크 큐에 넣고 → 양쪽 저장소에 보낸다.** 형식 변환은 중계에서 끝나고 저장소에는 Victoria 내부 형식으로 들어간다.
 
@@ -298,7 +298,7 @@
 
 ## 5. 포트
 
-![노드마다 같은 포트 지도](figures/05-port-map.png)
+![노드마다 같은 포트 지도](figures/05-port-map.svg)
 
 **바깥에 여는 포트는 넷이다.** 부품마다 포트를 열지 않고 HAProxy 한 곳으로 모아 경로로 나눈다. 부품은 모두 `127.0.0.1` 에서만 듣는다. 두 노드의 설정이 같고, 다른 것은 자기 주소와 상대 주소뿐이다.
 
@@ -332,7 +332,7 @@
 
 ### 5.1 노드 사이 상세 구조
 
-![노드 사이 상세 구조](figures/20-node-detail.png)
+![노드 사이 상세 구조](figures/20-node-detail.svg)
 
 | 흐름 | 지나가는 길 |
 |---|---|
@@ -349,7 +349,7 @@
 
 ## 6. 장애가 나면
 
-![장애 시나리오](figures/06-failover.png)
+![장애 시나리오](figures/06-failover.svg)
 
 | 경우 | 수집 | 저장 | 조회 | 사람이 할 일 |
 |---|---|---|---|---|
@@ -364,7 +364,7 @@
 
 ## 7. 양쪽이 다시 같아지는 과정
 
-![재동기화](figures/07-resync.png)
+![재동기화](figures/07-resync.svg)
 
 | 상황 | 결과 | 대응 |
 |---|---|---|
@@ -379,7 +379,7 @@
 
 ## 8. 에이전트 상세
 
-![OCB 에이전트](figures/09-agent.png)
+![OCB 에이전트](figures/09-agent.svg)
 
 ### 8.1 부품 구성
 
@@ -414,7 +414,7 @@
 
 ### 8.3 어느 OS 에서나 도는 에이전트
 
-![OS 무관 배포](figures/17-agent-deploy.png)
+![OS 무관 배포](figures/17-agent-deploy.svg)
 
 **원칙**: **바이너리 하나, 컨테이너 없음.** exporter 를 컨테이너로 돌리면 OS 마다 다른 컨테이너 런타임을 맞춰야 하고, GPU 장치를 컨테이너에 넘기는 일과 그 SELinux 라벨까지 따라온다. 컨테이너를 없애면 이 문제가 통째로 사라진다.
 
@@ -447,7 +447,7 @@
 
 ### 9.1 Prometheus 와 같이 쓰기
 
-![Prometheus 공존](figures/11-prometheus.png)
+![Prometheus 공존](figures/11-prometheus.svg)
 
 | 무엇 | 어떻게 |
 |---|---|
@@ -462,7 +462,7 @@
 
 ### 9.2 Prometheus ↔ VictoriaMetrics 를 오갈 수 있게
 
-![저장소 전환](figures/19-backend-switch.png)
+![저장소 전환](figures/19-backend-switch.svg)
 
 **질문**: 관리 서버를 Prometheus 와 Victoria 계열을 오가며 바로 전환할 수 있게 만들 수 있나?
 
@@ -510,7 +510,7 @@
 
 ## 11. PoC
 
-![PoC 구성](figures/13-poc.png)
+![PoC 구성](figures/13-poc.svg)
 
 **구성**: 중앙 노드 2대(Rocky Linux 10, SELinux enforcing, 8 vCPU · 16GB · 80GB), 에이전트 시험 VM(Debian 12 + NVIDIA T4 vGPU). Windows · AMD · NPU 서버는 확보되면 더한다. 판정 노드는 필요 없다. Prometheus 1대(9.2 시험용).
 
@@ -551,7 +551,7 @@
 
 ## 12. 도입 순서
 
-![도입 순서](figures/12-roadmap.png)
+![도입 순서](figures/12-roadmap.svg)
 
 | 단계 | 내용 | 되돌리기 |
 |---|---|---|
