@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" font-family="'Noto Sans CJK KR','Noto Sans KR','Malgun Gothic',sans-serif">
+<defs><marker id="m-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#475569"/></marker><marker id="s-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#475569"/></marker><marker id="m-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#2563eb"/></marker><marker id="s-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#2563eb"/></marker><marker id="m-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#ea580c"/></marker><marker id="s-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#ea580c"/></marker><marker id="m-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#059669"/></marker><marker id="s-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#059669"/></marker><marker id="m-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#dc2626"/></marker><marker id="s-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#dc2626"/></marker><marker id="m-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#7c3aed"/></marker><marker id="s-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#7c3aed"/></marker><marker id="m-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#d97706"/></marker><marker id="s-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#d97706"/></marker></defs>
+<rect width="1600" height="900" fill="#ffffff"/>
+<text x="40" y="58" font-size="32" font-weight="700" fill="#0f172a">PoC 구성 - 무엇을 띄우고 무엇을 확인하나</text>
+<text x="40" y="92" font-size="18" fill="#475569">중앙 2노드는 같은 구성을 노드 주소만 바꿔 띄운다. 판정 노드도 VIP 도 없다</text>
+<rect x="40" y="120" width="470" height="470" rx="22" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="64" y="156" font-size="20" fill="#1d4ed8" font-weight="700" text-anchor="start">노드 A</text>
+<rect x="65" y="170" width="420" height="66" rx="14" fill="#ffffff" stroke="#3b82f6" stroke-width="2"/>
+<text x="275.0" y="199.35" font-size="16.5" fill="#0f172a" font-weight="700" text-anchor="middle">HAProxy</text>
+<text x="275.0" y="220.2" font-size="13" fill="#475569" font-weight="400" text-anchor="middle">로컬 먼저 · 상대 노드 backup</text>
+<rect x="65" y="250" width="420" height="66" rx="14" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="275.0" y="279.34999999999997" font-size="16.5" fill="#9a3412" font-weight="700" text-anchor="middle">vmagent · vlagent · vtagent</text>
+<text x="275.0" y="300.2" font-size="13" fill="#9a3412" font-weight="400" text-anchor="middle">목적지마다 디스크 큐</text>
+<rect x="65" y="330" width="420" height="66" rx="14" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="275.0" y="359.34999999999997" font-size="16.5" fill="#065f46" font-weight="700" text-anchor="middle">VictoriaMetrics · Logs · Traces</text>
+<text x="275.0" y="380.2" font-size="13" fill="#047857" font-weight="400" text-anchor="middle">로컬 디스크</text>
+<rect x="65" y="410" width="420" height="66" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="275.0" y="439.34999999999997" font-size="16.5" fill="#0f172a" font-weight="700" text-anchor="middle">vmalert · Alertmanager</text>
+<text x="275.0" y="460.2" font-size="13" fill="#475569" font-weight="400" text-anchor="middle">같은 규칙 · AM 클러스터</text>
+<rect x="65" y="490" width="420" height="66" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="275.0" y="519.35" font-size="16.5" fill="#0f172a" font-weight="700" text-anchor="middle">vSphere 수집기 (A 만)</text>
+<text x="275.0" y="540.2" font-size="13" fill="#475569" font-weight="400" text-anchor="middle">중앙 수집기</text>
+<rect x="540" y="120" width="470" height="470" rx="22" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="564" y="156" font-size="20" fill="#1d4ed8" font-weight="700" text-anchor="start">노드 B</text>
+<rect x="565" y="170" width="420" height="66" rx="14" fill="#ffffff" stroke="#3b82f6" stroke-width="2"/>
+<text x="775.0" y="199.35" font-size="16.5" fill="#0f172a" font-weight="700" text-anchor="middle">HAProxy</text>
+<text x="775.0" y="220.2" font-size="13" fill="#475569" font-weight="400" text-anchor="middle">로컬 먼저 · 상대 노드 backup</text>
+<rect x="565" y="250" width="420" height="66" rx="14" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="775.0" y="279.34999999999997" font-size="16.5" fill="#9a3412" font-weight="700" text-anchor="middle">vmagent · vlagent · vtagent</text>
+<text x="775.0" y="300.2" font-size="13" fill="#9a3412" font-weight="400" text-anchor="middle">목적지마다 디스크 큐</text>
+<rect x="565" y="330" width="420" height="66" rx="14" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="775.0" y="359.34999999999997" font-size="16.5" fill="#065f46" font-weight="700" text-anchor="middle">VictoriaMetrics · Logs · Traces</text>
+<text x="775.0" y="380.2" font-size="13" fill="#047857" font-weight="400" text-anchor="middle">로컬 디스크</text>
+<rect x="565" y="410" width="420" height="66" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="775.0" y="439.34999999999997" font-size="16.5" fill="#0f172a" font-weight="700" text-anchor="middle">vmalert · Alertmanager</text>
+<text x="775.0" y="460.2" font-size="13" fill="#475569" font-weight="400" text-anchor="middle">같은 규칙 · AM 클러스터</text>
+<rect x="565" y="490" width="420" height="66" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+<text x="775.0" y="519.35" font-size="16.5" fill="#64748b" font-weight="700" text-anchor="middle">vSphere 수집기 (A 만)</text>
+<text x="775.0" y="540.2" font-size="13" fill="#94a3b8" font-weight="400" text-anchor="middle">중앙 수집기</text>
+<rect x="1040" y="120" width="520" height="470" rx="22" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+<text x="1064" y="156" font-size="19" fill="#0f172a" font-weight="700" text-anchor="start">테스트 에이전트</text>
+<text x="1300" y="200" font-size="14.5" fill="#475569" font-weight="400" text-anchor="middle">Rocky 10 (SELinux enforcing):</text>
+<text x="1300" y="240" font-size="14.5" fill="#475569" font-weight="400" text-anchor="middle">  중앙 노드 자신에도 에이전트</text>
+<text x="1300" y="280" font-size="14.5" fill="#475569" font-weight="400" text-anchor="middle">Debian 12 + NVIDIA T4 vGPU:</text>
+<text x="1300" y="320" font-size="14.5" fill="#475569" font-weight="400" text-anchor="middle">  에이전트 + GPU · GPM 수집</text>
+<text x="1300" y="360" font-size="14.5" fill="#475569" font-weight="400" text-anchor="middle">Windows VM: 확보되면</text>
+<text x="1300" y="400" font-size="14.5" fill="#475569" font-weight="400" text-anchor="middle">AMD · NPU 서버: 확보되면</text>
+<text x="1300" y="440" font-size="14.5" fill="#475569" font-weight="400" text-anchor="middle"></text>
+<text x="1300" y="480" font-size="14.5" fill="#475569" font-weight="400" text-anchor="middle">다른 대역 VM 1대 (라우팅만 됨)</text>
+<rect x="40" y="610" width="1520" height="250" rx="16" fill="#ecfdf5" stroke="#059669" stroke-width="1.5"/>
+<text x="64" y="648" font-size="20" fill="#065f46" font-weight="700" text-anchor="start">장애 시험</text>
+<text x="64" y="690" font-size="16" fill="#065f46" font-weight="400" text-anchor="start">① 노드 A 전원 차단 → 에이전트 전환 시간, 데이터 빈틈</text>
+<text x="824" y="690" font-size="16" fill="#065f46" font-weight="400" text-anchor="start">② 노드 B 1시간 정지 → 복구 뒤 큐가 비고 양쪽 건수가 같은가</text>
+<text x="64" y="742" font-size="16" fill="#065f46" font-weight="400" text-anchor="start">③ 노드 사이 네트워크 단절 → 각자 받고 복구 후 같아지는가</text>
+<text x="824" y="742" font-size="16" fill="#065f46" font-weight="400" text-anchor="start">④ 중계 프로세스만 죽이기 → HAProxy 가 상대 노드로 보내는가</text>
+<text x="64" y="794" font-size="16" fill="#065f46" font-weight="400" text-anchor="start">⑤ 큐 한도 초과 → 빈 구간 보충 절차가 되는가</text>
+<text x="824" y="794" font-size="16" fill="#065f46" font-weight="400" text-anchor="start">⑥ vmalert 한쪽 정지 → 알림이 한 번만 오는가</text>
+</svg>

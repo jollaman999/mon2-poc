@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="1600" height="1000" font-family="'Noto Sans CJK KR','Noto Sans KR','Malgun Gothic',sans-serif">
+<defs><marker id="m-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#475569"/></marker><marker id="s-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#475569"/></marker><marker id="m-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#2563eb"/></marker><marker id="s-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#2563eb"/></marker><marker id="m-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#ea580c"/></marker><marker id="s-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#ea580c"/></marker><marker id="m-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#059669"/></marker><marker id="s-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#059669"/></marker><marker id="m-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#dc2626"/></marker><marker id="s-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#dc2626"/></marker><marker id="m-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#7c3aed"/></marker><marker id="s-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#7c3aed"/></marker><marker id="m-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#d97706"/></marker><marker id="s-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#d97706"/></marker></defs>
+<rect width="1600" height="1000" fill="#ffffff"/>
+<text x="40" y="58" font-size="32" font-weight="700" fill="#0f172a">관리 서버 가 Prometheus 와 VictoriaMetrics 를 오갈 수 있게</text>
+<text x="40" y="92" font-size="18" fill="#475569">두 저장소가 함께 지원하는 것만 쓰면 주소 하나로 바꿀 수 있다. 전환 동안은 중계가 양쪽에 같이 쓴다</text>
+<rect x="40" y="160" width="300" height="120" rx="14" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="190.0" y="216.5" font-size="19" fill="#9a3412" font-weight="700" text-anchor="middle">OCB 에이전트</text>
+<text x="190.0" y="238.8" font-size="14" fill="#9a3412" font-weight="400" text-anchor="middle">OTLP/HTTP</text>
+<rect x="40" y="330" width="300" height="120" rx="14" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="190.0" y="376.34999999999997" font-size="19" fill="#9a3412" font-weight="700" text-anchor="middle">vmagent</text>
+<text x="190.0" y="398.65" font-size="14" fill="#9a3412" font-weight="400" text-anchor="middle">remote_write 를 여러 곳에</text>
+<text x="190.0" y="418.95" font-size="14" fill="#9a3412" font-weight="400" text-anchor="middle">(목적지별 큐)</text>
+<path d="M190,280 L190,328" stroke="#2563eb" stroke-width="3" fill="none" marker-end="url(#m-blue)"/>
+<rect x="520" y="150" width="360" height="140" rx="14" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="700.0" y="196.55" font-size="20" fill="#065f46" font-weight="700" text-anchor="middle">VictoriaMetrics</text>
+<text x="700.0" y="218.85000000000002" font-size="14" fill="#047857" font-weight="400" text-anchor="middle">remote_write · OTLP 받기</text>
+<text x="700.0" y="239.15" font-size="14" fill="#047857" font-weight="400" text-anchor="middle">Prometheus 조회 API</text>
+<text x="700.0" y="259.45" font-size="14" fill="#047857" font-weight="400" text-anchor="middle">+ MetricsQL 확장</text>
+<rect x="520" y="400" width="360" height="140" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="700.0" y="446.55" font-size="20" fill="#0f172a" font-weight="700" text-anchor="middle">Prometheus</text>
+<text x="700.0" y="468.85" font-size="14" fill="#475569" font-weight="400" text-anchor="middle">--web.enable-remote-write-receiver</text>
+<text x="700.0" y="489.15000000000003" font-size="14" fill="#475569" font-weight="400" text-anchor="middle">--web.enable-otlp-receiver</text>
+<text x="700.0" y="509.45" font-size="14" fill="#475569" font-weight="400" text-anchor="middle">Prometheus 조회 API</text>
+<path d="M340,370 C430,370 430,220 518,220" stroke="#ea580c" stroke-width="3" fill="none" marker-end="url(#m-orange)"/>
+<path d="M340,410 C430,410 430,470 518,470" stroke="#ea580c" stroke-width="3" fill="none" stroke-dasharray="8 6" marker-end="url(#m-orange)"/>
+<text x="212" y="310" font-size="14" fill="#ea580c" font-weight="700" text-anchor="start">전환할 때만 양쪽에</text>
+<rect x="1060" y="150" width="500" height="390" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="1310.0" y="270.8" font-size="20" fill="#0f172a" font-weight="700" text-anchor="middle">관리 서버</text>
+<text x="1310.0" y="293.1" font-size="14" fill="#475569" font-weight="400" text-anchor="middle">메트릭 백엔드 = 주소 + 종류 (설정)</text>
+<text x="1310.0" y="313.40000000000003" font-size="14" fill="#475569" font-weight="400" text-anchor="middle"></text>
+<text x="1310.0" y="333.7" font-size="14" fill="#475569" font-weight="400" text-anchor="middle">공통으로 쓰는 것만:</text>
+<text x="1310.0" y="354.0" font-size="14" fill="#475569" font-weight="400" text-anchor="middle">/api/v1/query · query_range · series · labels</text>
+<text x="1310.0" y="374.3" font-size="14" fill="#475569" font-weight="400" text-anchor="middle">PromQL (MetricsQL 확장 함수는 안 씀)</text>
+<text x="1310.0" y="394.6" font-size="14" fill="#475569" font-weight="400" text-anchor="middle"></text>
+<text x="1310.0" y="414.9" font-size="14" fill="#475569" font-weight="400" text-anchor="middle">알림: vmalert 는 둘 다 데이터소스로 쓴다</text>
+<text x="1310.0" y="435.20000000000005" font-size="14" fill="#475569" font-weight="400" text-anchor="middle">(Prometheus 규칙 형식 그대로)</text>
+<path d="M1058,260 L882,220" stroke="#059669" stroke-width="3" fill="none" marker-end="url(#m-green)"/>
+<path d="M1058,420 L882,470" stroke="#059669" stroke-width="3" fill="none" stroke-dasharray="8 6" marker-end="url(#m-green)"/>
+<rect x="40" y="590" width="760" height="380" rx="16" fill="#ecfdf5" stroke="#059669" stroke-width="1.5"/>
+<text x="64" y="630" font-size="19" fill="#065f46" font-weight="700" text-anchor="start">그대로 되는 것</text>
+<text x="64" y="668" font-size="15" fill="#047857" font-weight="400" text-anchor="start">· 쓰기: remote_write 1.0 · OTLP/HTTP (양쪽 다 받음)</text>
+<text x="64" y="708" font-size="15" fill="#047857" font-weight="400" text-anchor="start">· 조회: Prometheus HTTP API 와 PromQL</text>
+<text x="64" y="748" font-size="15" fill="#047857" font-weight="400" text-anchor="start">· 규칙: Prometheus 규칙 파일 (vmalert · Prometheus 둘 다)</text>
+<text x="64" y="788" font-size="15" fill="#047857" font-weight="400" text-anchor="start">· 알림: Alertmanager 는 같은 것</text>
+<text x="64" y="828" font-size="15" fill="#047857" font-weight="400" text-anchor="start">· 옮기기: 전환 기간 양쪽 동시 기록 → 주소만 바꿈</text>
+<text x="64" y="868" font-size="15" fill="#047857" font-weight="400" text-anchor="start">· Prometheus → VM 과거 데이터는 vmctl 로</text>
+<rect x="820" y="590" width="740" height="380" rx="16" fill="#fffbeb" stroke="#d97706" stroke-width="1.5"/>
+<text x="844" y="630" font-size="19" fill="#92400e" font-weight="700" text-anchor="start">맞춰 둬야 하는 것</text>
+<text x="844" y="668" font-size="15" fill="#92400e" font-weight="400" text-anchor="start">· OTLP 이름 변환: Prometheus 기본(밑줄 + 단위 접미사)과</text>
+<text x="844" y="708" font-size="15" fill="#92400e" font-weight="400" text-anchor="start">  VM -opentelemetry.usePrometheusNaming 을 같게 (확인 필요)</text>
+<text x="844" y="748" font-size="15" fill="#92400e" font-weight="400" text-anchor="start">· resource 속성: Prometheus 는 기본 0개, VM 은 기본 전부 라벨</text>
+<text x="844" y="788" font-size="15" fill="#92400e" font-weight="400" text-anchor="start">  → 양쪽에 같은 승격 목록을 준다</text>
+<text x="844" y="828" font-size="15" fill="#92400e" font-weight="400" text-anchor="start">· rate · increase 값이 조금 다르다 (VM 은 외삽 안 함)</text>
+<text x="844" y="868" font-size="15" fill="#92400e" font-weight="400" text-anchor="start">· VM → Prometheus 과거 데이터 이동 도구는 없다 (동시 기록으로 피함)</text>
+<text x="844" y="908" font-size="15" fill="#92400e" font-weight="400" text-anchor="start">· 로그 · 트레이스는 Prometheus 에 없다 (메트릭만 해당)</text>
+</svg>

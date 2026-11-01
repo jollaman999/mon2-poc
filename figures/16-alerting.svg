@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 960" width="1600" height="960" font-family="'Noto Sans CJK KR','Noto Sans KR','Malgun Gothic',sans-serif">
+<defs><marker id="m-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#475569"/></marker><marker id="s-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#475569"/></marker><marker id="m-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#2563eb"/></marker><marker id="s-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#2563eb"/></marker><marker id="m-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#ea580c"/></marker><marker id="s-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#ea580c"/></marker><marker id="m-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#059669"/></marker><marker id="s-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#059669"/></marker><marker id="m-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#dc2626"/></marker><marker id="s-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#dc2626"/></marker><marker id="m-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#7c3aed"/></marker><marker id="s-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#7c3aed"/></marker><marker id="m-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#d97706"/></marker><marker id="s-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#d97706"/></marker></defs>
+<rect width="1600" height="960" fill="#ffffff"/>
+<text x="40" y="58" font-size="32" font-weight="700" fill="#0f172a">알림 - Grafana 대신 vmalert · Alertmanager</text>
+<text x="40" y="92" font-size="18" fill="#475569">알림 평가를 Victoria 쪽 부품에 맡기고, 관리 서버는 규칙을 내주고 결과를 받기만 한다</text>
+<rect x="40" y="120" width="740" height="600" rx="22" fill="#fef2f2" stroke="#dc2626" stroke-width="2"/>
+<text x="64" y="156" font-size="20" fill="#991b1b" font-weight="700" text-anchor="start">Grafana 를 알림 엔진으로 쓰면</text>
+<rect x="70" y="180" width="300" height="110" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="220.0" y="221.72500000000002" font-size="18" fill="#0f172a" font-weight="700" text-anchor="middle">관리 서버</text>
+<text x="220.0" y="243.3" font-size="13.5" fill="#475569" font-weight="400" text-anchor="middle">알림 정책 화면 · DB</text>
+<text x="220.0" y="262.875" font-size="13.5" fill="#475569" font-weight="400" text-anchor="middle">Grafana API 로 규칙 생성</text>
+<rect x="450" y="180" width="300" height="110" rx="14" fill="#fffbeb" stroke="#d97706" stroke-width="2"/>
+<text x="600.0" y="221.72500000000002" font-size="18" fill="#92400e" font-weight="700" text-anchor="middle">Grafana</text>
+<text x="600.0" y="243.3" font-size="13.5" fill="#b45309" font-weight="400" text-anchor="middle">규칙 평가</text>
+<text x="600.0" y="262.875" font-size="13.5" fill="#b45309" font-weight="400" text-anchor="middle">contact point · 정책</text>
+<rect x="450" y="340" width="300" height="90" rx="14" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="600.0" y="390.95" font-size="17" fill="#065f46" font-weight="700" text-anchor="middle">저장소</text>
+<path d="M370,235 L448,235" stroke="#475569" stroke-width="2.5" fill="none" marker-end="url(#m-gray)"/>
+<path d="M600,290 L600,338" stroke="#059669" stroke-width="2.5" fill="none" marker-end="url(#m-green)"/>
+<path d="M450,270 C400,300 380,300 372,280" stroke="#7c3aed" stroke-width="2.5" fill="none" marker-end="url(#m-purple)"/>
+<text x="400" y="330" font-size="14" fill="#7c3aed" font-weight="700" text-anchor="middle">webhook</text>
+<text x="70" y="490" font-size="15" fill="#b91c1c" font-weight="400" text-anchor="start">- 조직 · 폴더 · contact point · 정책을 API 로 맞춰야 한다</text>
+<text x="70" y="530" font-size="15" fill="#b91c1c" font-weight="400" text-anchor="start">- 규칙이 많아지면 평가 시간을 나눠 맞춰야 한다</text>
+<text x="70" y="570" font-size="15" fill="#b91c1c" font-weight="400" text-anchor="start">- 2노드면 Grafana 도 2대, 규칙 동기화가 또 필요하다</text>
+<text x="70" y="610" font-size="15" fill="#b91c1c" font-weight="400" text-anchor="start">- Grafana 는 AGPL-3.0 (2021 v8 부터)</text>
+<rect x="820" y="120" width="740" height="600" rx="22" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="844" y="156" font-size="20" fill="#065f46" font-weight="700" text-anchor="start">이 설계</text>
+<rect x="850" y="180" width="300" height="110" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="1000.0" y="221.72500000000002" font-size="18" fill="#0f172a" font-weight="700" text-anchor="middle">관리 서버</text>
+<text x="1000.0" y="243.3" font-size="13.5" fill="#475569" font-weight="400" text-anchor="middle">알림 정책 화면 · DB</text>
+<text x="1000.0" y="262.875" font-size="13.5" fill="#475569" font-weight="400" text-anchor="middle">규칙을 HTTP 로 내준다</text>
+<rect x="1230" y="180" width="300" height="110" rx="14" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="1380.0" y="221.72500000000002" font-size="18" fill="#9a3412" font-weight="700" text-anchor="middle">vmalert × 2</text>
+<text x="1380.0" y="243.3" font-size="13.5" fill="#9a3412" font-weight="400" text-anchor="middle">노드마다 1개 · 같은 규칙</text>
+<text x="1380.0" y="262.875" font-size="13.5" fill="#9a3412" font-weight="400" text-anchor="middle">메트릭 · 로그 · 트레이스 규칙</text>
+<rect x="1230" y="340" width="300" height="90" rx="14" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="1380.0" y="390.95" font-size="17" fill="#065f46" font-weight="700" text-anchor="middle">Victoria 3종 (로컬)</text>
+<rect x="1230" y="470" width="300" height="110" rx="14" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="1380.0" y="511.725" font-size="18" fill="#9a3412" font-weight="700" text-anchor="middle">Alertmanager × 2</text>
+<text x="1380.0" y="533.3000000000001" font-size="13.5" fill="#9a3412" font-weight="400" text-anchor="middle">클러스터 · 같은 알림을 1번만</text>
+<text x="1380.0" y="552.875" font-size="13.5" fill="#9a3412" font-weight="400" text-anchor="middle">→ webhook 1곳</text>
+<path d="M1150,235 L1228,235" stroke="#475569" stroke-width="2.5" fill="none" marker-end="url(#m-gray)"/>
+<path d="M1380,290 L1380,338" stroke="#059669" stroke-width="2.5" fill="none" marker-end="url(#m-green)"/>
+<path d="M1250,290 C1200,380 1200,470 1228,520" stroke="#7c3aed" stroke-width="2.5" fill="none" marker-end="url(#m-purple)"/>
+<path d="M1228,540 C1100,540 1050,420 1000,292" stroke="#7c3aed" stroke-width="2.5" fill="none" marker-end="url(#m-purple)"/>
+<text x="990" y="420" font-size="14" fill="#7c3aed" font-weight="700" text-anchor="middle">webhook</text>
+<text x="850" y="640" font-size="15" fill="#065f46" font-weight="700" text-anchor="start">발송(메일 등)은 관리 서버가 한다</text>
+<rect x="40" y="750" width="1520" height="180" rx="16" fill="#fffbeb" stroke="#d97706" stroke-width="1.5"/>
+<text x="64" y="790" font-size="19" fill="#92400e" font-weight="700" text-anchor="start">관리 서버가 할 일은 네 가지뿐이다</text>
+<text x="64" y="828" font-size="15.5" fill="#92400e" font-weight="400" text-anchor="start">· 규칙 파일 만들기 (Prometheus 규칙 형식 · LogsQL)</text>
+<text x="64" y="862" font-size="15.5" fill="#92400e" font-weight="400" text-anchor="start">· 규칙을 HTTP 로 내주기 (두 vmalert 가 같은 주소에서 가져간다)</text>
+<text x="64" y="896" font-size="15.5" fill="#92400e" font-weight="400" text-anchor="start">· Alertmanager webhook 받기 · 알림 상태 조회 (vmalert · Alertmanager API)</text>
+</svg>

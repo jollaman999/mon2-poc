@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1040" width="1600" height="1040" font-family="'Noto Sans CJK KR','Noto Sans KR','Malgun Gothic',sans-serif">
+<defs><marker id="m-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#475569"/></marker><marker id="s-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#475569"/></marker><marker id="m-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#2563eb"/></marker><marker id="s-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#2563eb"/></marker><marker id="m-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#ea580c"/></marker><marker id="s-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#ea580c"/></marker><marker id="m-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#059669"/></marker><marker id="s-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#059669"/></marker><marker id="m-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#dc2626"/></marker><marker id="s-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#dc2626"/></marker><marker id="m-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#7c3aed"/></marker><marker id="s-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#7c3aed"/></marker><marker id="m-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#d97706"/></marker><marker id="s-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#d97706"/></marker></defs>
+<rect width="1600" height="1040" fill="#ffffff"/>
+<text x="40" y="58" font-size="32" font-weight="700" fill="#0f172a">진입점 이중화 - L2 VIP 대신 L3 로</text>
+<text x="40" y="92" font-size="18" fill="#475569">VIP(VRRP) 는 같은 L2 안에서만 넘어간다. 주소를 하나로 모으지 않고, 보내는 쪽이 두 주소를 다 알게 했다</text>
+<rect x="40" y="120" width="495" height="560" rx="18" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5"/>
+<text x="287" y="160" font-size="18" fill="#0f172a" font-weight="700" text-anchor="middle">① keepalived VIP (VRRP)</text>
+<rect x="187" y="176" width="200" height="32" rx="16" fill="#dc2626"/>
+<text x="287" y="199" font-size="15" fill="#ffffff" font-weight="700" text-anchor="middle">기존안 · 탈락</text>
+<rect x="555" y="120" width="495" height="560" rx="18" fill="#ecfdf5" stroke="#059669" stroke-width="3"/>
+<text x="802" y="160" font-size="18" fill="#0f172a" font-weight="700" text-anchor="middle">② 에이전트가 주소 2개 + 노드별 HAProxy</text>
+<rect x="702" y="176" width="200" height="32" rx="16" fill="#059669"/>
+<text x="802" y="199" font-size="15" fill="#ffffff" font-weight="700" text-anchor="middle">선택</text>
+<rect x="1070" y="120" width="495" height="560" rx="18" fill="#ffffff" stroke="#64748b" stroke-width="1.5"/>
+<text x="1317" y="160" font-size="18" fill="#0f172a" font-weight="700" text-anchor="middle">③ BGP anycast · 플랫폼 LB</text>
+<rect x="1217" y="176" width="200" height="32" rx="16" fill="#d97706"/>
+<text x="1317" y="199" font-size="15" fill="#ffffff" font-weight="700" text-anchor="middle">현장에 있으면 앞에 덧붙임</text>
+<rect x="80" y="240" width="180" height="70" rx="14" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="170.0" y="271.525" font-size="17" fill="#1d4ed8" font-weight="700" text-anchor="middle">노드 A</text>
+<text x="170.0" y="292.375" font-size="13" fill="#1e40af" font-weight="400" text-anchor="middle">VIP 보유</text>
+<rect x="315" y="240" width="180" height="70" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+<text x="405.0" y="271.525" font-size="17" fill="#64748b" font-weight="700" text-anchor="middle">노드 B</text>
+<text x="405.0" y="292.375" font-size="13" fill="#94a3b8" font-weight="400" text-anchor="middle">대기</text>
+<rect x="80" y="330" width="415" height="44" rx="10" fill="#fef2f2" stroke="#dc2626" stroke-width="1.5"/>
+<text x="287" y="358" font-size="15" fill="#b91c1c" font-weight="700" text-anchor="middle">같은 L2 대역에 있어야 GARP 로 넘어간다</text>
+<text x="70" y="410" font-size="14" fill="#b91c1c" font-weight="400" text-anchor="start">- OpenStack: allowed-address-pairs · VRRP 보안그룹</text>
+<text x="70" y="444" font-size="14" fill="#b91c1c" font-weight="400" text-anchor="start">  · FIP 를 붙이면 DVR · OVN 에서 문제 보고</text>
+<text x="70" y="478" font-size="14" fill="#b91c1c" font-weight="400" text-anchor="start">- VMware: 포트그룹 보안 정책(MAC 변경 · 위조</text>
+<text x="70" y="512" font-size="14" fill="#b91c1c" font-weight="400" text-anchor="start">  전송) 확인, NSX 세그먼트 정책이 또 다르다</text>
+<text x="70" y="546" font-size="14" fill="#b91c1c" font-weight="400" text-anchor="start">- 두 노드를 다른 대역 · 다른 사이트에 못 둔다</text>
+<text x="70" y="580" font-size="14" fill="#b91c1c" font-weight="400" text-anchor="start">- 2노드라 split-brain 판정 노드가 필요</text>
+<text x="70" y="614" font-size="14" fill="#b91c1c" font-weight="400" text-anchor="start">- VIP 자체는 Active-Standby</text>
+<rect x="585" y="235" width="160" height="64" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+<text x="665.0" y="263.5375" font-size="16" fill="#0f172a" font-weight="700" text-anchor="middle">에이전트</text>
+<text x="665.0" y="283.6625" font-size="12.5" fill="#475569" font-weight="400" text-anchor="middle">A,B 또는 B,A</text>
+<rect x="825" y="225" width="190" height="56" rx="14" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="920.0" y="258.25" font-size="15" fill="#1d4ed8" font-weight="700" text-anchor="middle">노드 A · HAProxy</text>
+<rect x="825" y="300" width="190" height="56" rx="14" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="920.0" y="333.25" font-size="15" fill="#1d4ed8" font-weight="700" text-anchor="middle">노드 B · HAProxy</text>
+<path d="M745,258 L823,253" stroke="#2563eb" stroke-width="2.5" fill="none" marker-end="url(#m-blue)"/>
+<path d="M745,275 L823,325" stroke="#2563eb" stroke-width="2" fill="none" stroke-dasharray="6 4" marker-end="url(#m-blue)"/>
+<path d="M920,281 L920,298" stroke="#ea580c" stroke-width="2" fill="none" marker-end="url(#m-orange)" marker-start="url(#s-orange)"/>
+<text x="585" y="410" font-size="14" fill="#065f46" font-weight="400" text-anchor="start">+ 라우팅만 되면 어디서나: 다른 대역 · 다른 사이트 ·</text>
+<text x="585" y="444" font-size="14" fill="#065f46" font-weight="400" text-anchor="start">  OpenStack · VMware · 베어메탈 구분 없음</text>
+<text x="585" y="478" font-size="14" fill="#065f46" font-weight="400" text-anchor="start">+ 두 노드가 늘 같이 일한다 (진짜 Active-Active)</text>
+<text x="585" y="512" font-size="14" fill="#065f46" font-weight="400" text-anchor="start">+ 넘겨줄 주소가 없어 split-brain 이 없다</text>
+<text x="585" y="546" font-size="14" fill="#065f46" font-weight="400" text-anchor="start">+ 플랫폼 설정(AAP · 포트그룹 정책)이 필요 없다</text>
+<text x="585" y="580" font-size="14" fill="#065f46" font-weight="400" text-anchor="start">- 에이전트에 주소 전환 exporter 를 만든다 (작음)</text>
+<text x="585" y="614" font-size="14" fill="#065f46" font-weight="400" text-anchor="start">- 노드 주소가 바뀌면 설정을 다시 내린다</text>
+<rect x="1110" y="235" width="415" height="56" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="1317.5" y="259.55" font-size="15" fill="#0f172a" font-weight="700" text-anchor="middle">BGP anycast (FRR · BIRD)</text>
+<text x="1317.5" y="278.95" font-size="12" fill="#475569" font-weight="400" text-anchor="middle">두 노드가 같은 /32 를 광고 · 망 담당 협조 필요</text>
+<rect x="1110" y="305" width="415" height="56" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="1317.5" y="329.55" font-size="15" fill="#0f172a" font-weight="700" text-anchor="middle">Octavia · NSX ALB(Avi) 등 플랫폼 LB</text>
+<text x="1317.5" y="348.95" font-size="12" fill="#475569" font-weight="400" text-anchor="middle">플랫폼마다 따로 · Avi 는 상용</text>
+<text x="1100" y="410" font-size="14" fill="#334155" font-weight="400" text-anchor="start">- OpenStack VM 이 Neutron 라우터와 BGP 를 맺는</text>
+<text x="1100" y="444" font-size="14" fill="#334155" font-weight="400" text-anchor="start">  공식 방법은 찾지 못함 (확인 필요)</text>
+<text x="1100" y="478" font-size="14" fill="#334155" font-weight="400" text-anchor="start">- NSX T0 는 BGP 이웃을 받지만 워크로드 VM 이</text>
+<text x="1100" y="512" font-size="14" fill="#334155" font-weight="400" text-anchor="start">  직접 맺는 문서는 못 찾음 (확인 필요)</text>
+<text x="1100" y="546" font-size="14" fill="#334155" font-weight="400" text-anchor="start">- 그래서 기본으로 두지 않는다</text>
+<text x="1100" y="580" font-size="14" fill="#334155" font-weight="400" text-anchor="start">+ 현장에 이미 있으면 ② 의 앞에 붙여</text>
+<text x="1100" y="614" font-size="14" fill="#334155" font-weight="400" text-anchor="start">  주소 하나로도 쓸 수 있다</text>
+<text x="40" y="725" font-size="19" fill="#0f172a" font-weight="700" text-anchor="start">어디서 되나</text>
+<text x="60" y="770" font-size="15.5" fill="#0f172a" font-weight="700" text-anchor="start">OpenStack 같은 대역</text>
+<line x1="40" y1="788" x2="1560" y2="788" stroke="#e2e8f0" stroke-width="1"/>
+<text x="370" y="770" font-size="15.5" fill="#047857" font-weight="700" text-anchor="middle">O</text>
+<text x="885" y="770" font-size="15.5" fill="#047857" font-weight="700" text-anchor="middle">O</text>
+<text x="1400" y="770" font-size="15.5" fill="#b45309" font-weight="700" text-anchor="middle">△</text>
+<text x="60" y="820" font-size="15.5" fill="#0f172a" font-weight="700" text-anchor="start">OpenStack 다른 대역</text>
+<line x1="40" y1="838" x2="1560" y2="838" stroke="#e2e8f0" stroke-width="1"/>
+<text x="370" y="820" font-size="15.5" fill="#047857" font-weight="700" text-anchor="middle">O (라우터 경유)</text>
+<text x="885" y="820" font-size="15.5" fill="#047857" font-weight="700" text-anchor="middle">O</text>
+<text x="1400" y="820" font-size="15.5" fill="#b45309" font-weight="700" text-anchor="middle">△</text>
+<text x="60" y="870" font-size="15.5" fill="#0f172a" font-weight="700" text-anchor="start">VMware vSphere · NSX</text>
+<line x1="40" y1="888" x2="1560" y2="888" stroke="#e2e8f0" stroke-width="1"/>
+<text x="370" y="870" font-size="15.5" fill="#b45309" font-weight="700" text-anchor="middle">△ 포트그룹 정책</text>
+<text x="885" y="870" font-size="15.5" fill="#047857" font-weight="700" text-anchor="middle">O</text>
+<text x="1400" y="870" font-size="15.5" fill="#b45309" font-weight="700" text-anchor="middle">△</text>
+<text x="60" y="920" font-size="15.5" fill="#0f172a" font-weight="700" text-anchor="start">베어메탈 · 다른 사이트</text>
+<line x1="40" y1="938" x2="1560" y2="938" stroke="#e2e8f0" stroke-width="1"/>
+<text x="370" y="920" font-size="15.5" fill="#b45309" font-weight="700" text-anchor="middle">△ FIP · provider 망</text>
+<text x="885" y="920" font-size="15.5" fill="#047857" font-weight="700" text-anchor="middle">O (방화벽만)</text>
+<text x="1400" y="920" font-size="15.5" fill="#b45309" font-weight="700" text-anchor="middle">△</text>
+<text x="60" y="970" font-size="15.5" fill="#0f172a" font-weight="700" text-anchor="start">중앙 노드끼리 다른 대역</text>
+<line x1="40" y1="988" x2="1560" y2="988" stroke="#e2e8f0" stroke-width="1"/>
+<text x="370" y="970" font-size="15.5" fill="#b91c1c" font-weight="700" text-anchor="middle">X</text>
+<text x="885" y="970" font-size="15.5" fill="#047857" font-weight="700" text-anchor="middle">O</text>
+<text x="1400" y="970" font-size="15.5" fill="#047857" font-weight="700" text-anchor="middle">O (BGP)</text>
+</svg>

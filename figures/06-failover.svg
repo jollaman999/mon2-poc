@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 930" width="1600" height="930" font-family="'Noto Sans CJK KR','Noto Sans KR','Malgun Gothic',sans-serif">
+<defs><marker id="m-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#475569"/></marker><marker id="s-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#475569"/></marker><marker id="m-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#2563eb"/></marker><marker id="s-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#2563eb"/></marker><marker id="m-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#ea580c"/></marker><marker id="s-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#ea580c"/></marker><marker id="m-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#059669"/></marker><marker id="s-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#059669"/></marker><marker id="m-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#dc2626"/></marker><marker id="s-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#dc2626"/></marker><marker id="m-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#7c3aed"/></marker><marker id="s-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#7c3aed"/></marker><marker id="m-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#d97706"/></marker><marker id="s-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#d97706"/></marker></defs>
+<rect width="1600" height="930" fill="#ffffff"/>
+<text x="40" y="58" font-size="32" font-weight="700" fill="#0f172a">장애가 나면 무슨 일이 생기나 - 4가지 경우</text>
+<text x="40" y="92" font-size="18" fill="#475569">VIP 가 없으니 넘겨줄 주소도, split-brain 도 없다. 에이전트가 살아 있는 노드로 바꿔 보내고 중계가 빈 몫을 큐에 쌓는다</text>
+<rect x="40" y="120" width="750" height="380" rx="18" fill="#ecfdf5" stroke="#059669" stroke-width="1.5"/>
+<text x="64" y="158" font-size="21" fill="#0f172a" font-weight="700" text-anchor="start">① 평상시</text>
+<text x="64" y="186" font-size="15" fill="#475569" font-weight="400" text-anchor="start">에이전트 절반은 A, 절반은 B 로 보낸다</text>
+<rect x="64" y="230" width="160" height="70" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+<text x="144.0" y="261.1875" font-size="15" fill="#0f172a" font-weight="700" text-anchor="middle">A 먼저 에이전트</text>
+<text x="144.0" y="281.3125" font-size="12.5" fill="#475569" font-weight="400" text-anchor="middle">디스크 큐</text>
+<rect x="64" y="330" width="160" height="70" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+<text x="144.0" y="361.1875" font-size="15" fill="#0f172a" font-weight="700" text-anchor="middle">B 먼저 에이전트</text>
+<text x="144.0" y="381.3125" font-size="12.5" fill="#475569" font-weight="400" text-anchor="middle">디스크 큐</text>
+<rect x="340" y="240" width="190" height="150" rx="14" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="435.0" y="312.22499999999997" font-size="19" fill="#1d4ed8" font-weight="700" text-anchor="middle">노드 A</text>
+<text x="435.0" y="333.075" font-size="13" fill="#1e40af" font-weight="400" text-anchor="middle">HAProxy · 중계 · 저장소</text>
+<rect x="570" y="240" width="190" height="150" rx="14" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="665.0" y="312.22499999999997" font-size="19" fill="#1d4ed8" font-weight="700" text-anchor="middle">노드 B</text>
+<text x="665.0" y="333.075" font-size="13" fill="#1e40af" font-weight="400" text-anchor="middle">HAProxy · 중계 · 저장소</text>
+<path d="M224,265 L338,285" stroke="#2563eb" stroke-width="2.5" fill="none" marker-end="url(#m-blue)"/>
+<path d="M224,370 C340,440 600,440 660,392" stroke="#2563eb" stroke-width="2.5" fill="none" marker-end="url(#m-blue)"/>
+<text x="415" y="450" font-size="14.5" fill="#334155" font-weight="400" text-anchor="middle">중계는 양쪽 저장소에 같은 내용을 기록</text>
+<text x="415" y="474" font-size="14.5" fill="#334155" font-weight="400" text-anchor="middle">조회도 관리 서버 가 양쪽에 나눈다</text>
+<rect x="810" y="120" width="750" height="380" rx="18" fill="#fffbeb" stroke="#d97706" stroke-width="1.5"/>
+<text x="834" y="158" font-size="21" fill="#0f172a" font-weight="700" text-anchor="start">② 노드 A 장애</text>
+<text x="834" y="186" font-size="15" fill="#475569" font-weight="400" text-anchor="start">A 먼저였던 에이전트가 B 로 바꿔 보낸다</text>
+<rect x="834" y="230" width="160" height="70" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+<text x="914.0" y="261.1875" font-size="15" fill="#0f172a" font-weight="700" text-anchor="middle">A 먼저 에이전트</text>
+<text x="914.0" y="281.3125" font-size="12.5" fill="#475569" font-weight="400" text-anchor="middle">디스크 큐</text>
+<rect x="834" y="330" width="160" height="70" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+<text x="914.0" y="361.1875" font-size="15" fill="#0f172a" font-weight="700" text-anchor="middle">B 먼저 에이전트</text>
+<text x="914.0" y="381.3125" font-size="12.5" fill="#475569" font-weight="400" text-anchor="middle">디스크 큐</text>
+<rect x="1110" y="240" width="190" height="150" rx="14" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+<text x="1205.0" y="312.22499999999997" font-size="19" fill="#64748b" font-weight="700" text-anchor="middle">노드 A</text>
+<text x="1205.0" y="333.075" font-size="13" fill="#94a3b8" font-weight="400" text-anchor="middle">HAProxy · 중계 · 저장소</text>
+<path d="M1171,281L1239,349M1239,281L1171,349" stroke="#dc2626" stroke-width="5"/>
+<rect x="1340" y="240" width="190" height="150" rx="14" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="1435.0" y="312.22499999999997" font-size="19" fill="#1d4ed8" font-weight="700" text-anchor="middle">노드 B</text>
+<text x="1435.0" y="333.075" font-size="13" fill="#1e40af" font-weight="400" text-anchor="middle">HAProxy · 중계 · 저장소</text>
+<path d="M994,260 C1190,200 1370,200 1430,238" stroke="#2563eb" stroke-width="2.5" fill="none" stroke-dasharray="7 5" marker-end="url(#m-blue)"/>
+<path d="M994,370 C1110,440 1370,440 1430,392" stroke="#2563eb" stroke-width="2.5" fill="none" marker-end="url(#m-blue)"/>
+<text x="1185" y="450" font-size="14.5" fill="#334155" font-weight="400" text-anchor="middle">끊기는 시간 = 에이전트의 재시도 간격 (그동안 디스크 큐)</text>
+<text x="1185" y="474" font-size="14.5" fill="#334155" font-weight="400" text-anchor="middle">B 의 중계가 A 몫을 큐에 쌓고, A 가 돌아오면 보낸다</text>
+<rect x="40" y="520" width="750" height="380" rx="18" fill="#fffbeb" stroke="#d97706" stroke-width="1.5"/>
+<text x="64" y="558" font-size="21" fill="#0f172a" font-weight="700" text-anchor="start">③ 노드 사이 단절</text>
+<text x="64" y="586" font-size="15" fill="#475569" font-weight="400" text-anchor="start">각자 받고, 상대 몫은 큐에 쌓는다</text>
+<rect x="64" y="630" width="160" height="70" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+<text x="144.0" y="661.1875" font-size="15" fill="#0f172a" font-weight="700" text-anchor="middle">A 먼저 에이전트</text>
+<text x="144.0" y="681.3125" font-size="12.5" fill="#475569" font-weight="400" text-anchor="middle">디스크 큐</text>
+<rect x="64" y="730" width="160" height="70" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+<text x="144.0" y="761.1875" font-size="15" fill="#0f172a" font-weight="700" text-anchor="middle">B 먼저 에이전트</text>
+<text x="144.0" y="781.3125" font-size="12.5" fill="#475569" font-weight="400" text-anchor="middle">디스크 큐</text>
+<rect x="340" y="640" width="190" height="150" rx="14" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="435.0" y="712.225" font-size="19" fill="#1d4ed8" font-weight="700" text-anchor="middle">노드 A</text>
+<text x="435.0" y="733.075" font-size="13" fill="#1e40af" font-weight="400" text-anchor="middle">HAProxy · 중계 · 저장소</text>
+<rect x="570" y="640" width="190" height="150" rx="14" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="665.0" y="712.225" font-size="19" fill="#1d4ed8" font-weight="700" text-anchor="middle">노드 B</text>
+<text x="665.0" y="733.075" font-size="13" fill="#1e40af" font-weight="400" text-anchor="middle">HAProxy · 중계 · 저장소</text>
+<path d="M224,665 L338,685" stroke="#2563eb" stroke-width="2.5" fill="none" marker-end="url(#m-blue)"/>
+<path d="M224,770 C340,840 600,840 660,792" stroke="#2563eb" stroke-width="2.5" fill="none" marker-end="url(#m-blue)"/>
+<path d="M545,660 L565,710 L545,735 L560,780" stroke="#dc2626" stroke-width="5" fill="none"/>
+<text x="415" y="850" font-size="14.5" fill="#334155" font-weight="400" text-anchor="middle">단절 동안 두 저장소 내용이 잠시 다르다</text>
+<text x="415" y="874" font-size="14.5" fill="#334155" font-weight="400" text-anchor="middle">복구되면 큐가 비며 같아진다 · 조회는 한쪽에 고정</text>
+<rect x="810" y="520" width="750" height="380" rx="18" fill="#fffbeb" stroke="#d97706" stroke-width="1.5"/>
+<text x="834" y="558" font-size="21" fill="#0f172a" font-weight="700" text-anchor="start">④ 노드 A 의 중계만 죽음</text>
+<text x="834" y="586" font-size="15" fill="#475569" font-weight="400" text-anchor="start">A 의 HAProxy 가 B 의 중계로 보낸다</text>
+<rect x="834" y="630" width="160" height="70" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+<text x="914.0" y="661.1875" font-size="15" fill="#0f172a" font-weight="700" text-anchor="middle">A 먼저 에이전트</text>
+<text x="914.0" y="681.3125" font-size="12.5" fill="#475569" font-weight="400" text-anchor="middle">디스크 큐</text>
+<rect x="834" y="730" width="160" height="70" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+<text x="914.0" y="761.1875" font-size="15" fill="#0f172a" font-weight="700" text-anchor="middle">B 먼저 에이전트</text>
+<text x="914.0" y="781.3125" font-size="12.5" fill="#475569" font-weight="400" text-anchor="middle">디스크 큐</text>
+<rect x="1110" y="640" width="190" height="150" rx="14" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="1205.0" y="712.225" font-size="19" fill="#1d4ed8" font-weight="700" text-anchor="middle">노드 A</text>
+<text x="1205.0" y="733.075" font-size="13" fill="#1e40af" font-weight="400" text-anchor="middle">HAProxy · 저장소 정상</text>
+<rect x="1340" y="640" width="190" height="150" rx="14" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="1435.0" y="712.225" font-size="19" fill="#1d4ed8" font-weight="700" text-anchor="middle">노드 B</text>
+<text x="1435.0" y="733.075" font-size="13" fill="#1e40af" font-weight="400" text-anchor="middle">HAProxy · 중계 · 저장소</text>
+<rect x="1130" y="746" width="150" height="32" rx="8" fill="#f1f5f9" stroke="#dc2626" stroke-width="2"/>
+<text x="1205" y="768" font-size="14" fill="#b91c1c" font-weight="700" text-anchor="middle">중계 멈춤</text>
+<path d="M994,665 L1108,685" stroke="#2563eb" stroke-width="2.5" fill="none" marker-end="url(#m-blue)"/>
+<path d="M994,770 C1110,840 1370,840 1430,792" stroke="#2563eb" stroke-width="2.5" fill="none" marker-end="url(#m-blue)"/>
+<path d="M1280,762 L1338,762" stroke="#2563eb" stroke-width="2.5" fill="none" marker-end="url(#m-blue)"/>
+<text x="1185" y="850" font-size="14.5" fill="#334155" font-weight="400" text-anchor="middle">에이전트는 아무것도 모른다 (주소 그대로)</text>
+<text x="1185" y="874" font-size="14.5" fill="#334155" font-weight="400" text-anchor="middle">저장은 B 의 중계가 양쪽에 계속 기록</text>
+</svg>

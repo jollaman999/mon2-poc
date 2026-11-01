@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="1600" height="1000" font-family="'Noto Sans CJK KR','Noto Sans KR','Malgun Gothic',sans-serif">
+<defs><marker id="m-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#475569"/></marker><marker id="s-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#475569"/></marker><marker id="m-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#2563eb"/></marker><marker id="s-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#2563eb"/></marker><marker id="m-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#ea580c"/></marker><marker id="s-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#ea580c"/></marker><marker id="m-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#059669"/></marker><marker id="s-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#059669"/></marker><marker id="m-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#dc2626"/></marker><marker id="s-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#dc2626"/></marker><marker id="m-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#7c3aed"/></marker><marker id="s-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#7c3aed"/></marker><marker id="m-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#d97706"/></marker><marker id="s-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#d97706"/></marker></defs>
+<rect width="1600" height="1000" fill="#ffffff"/>
+<text x="40" y="58" font-size="32" font-weight="700" fill="#0f172a">중계기를 OTel Collector 가 아니라 Victoria 에이전트로 둔 이유</text>
+<text x="40" y="92" font-size="18" fill="#475569">둘 다 "받아서 양쪽에 복제 + 목적지별 디스크 큐" 는 된다. 갈린 것은 Prometheus 쪽 입구, 큐를 보는 단위, 저장소와의 짝이다</text>
+<rect x="40" y="120" width="740" height="600" rx="22" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+<text x="64" y="156" font-size="20" fill="#0f172a" font-weight="700" text-anchor="start">OTel Collector 게이트웨이</text>
+<rect x="70" y="180" width="220" height="80" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="180.0" y="225.6" font-size="16" fill="#0f172a" font-weight="700" text-anchor="middle">OTLP 수신</text>
+<rect x="70" y="280" width="220" height="80" rx="14" fill="#fffbeb" stroke="#d97706" stroke-width="2"/>
+<text x="180.0" y="316.175" font-size="16" fill="#92400e" font-weight="700" text-anchor="middle">remote_write 수신</text>
+<text x="180.0" y="337.02500000000003" font-size="13" fill="#b45309" font-weight="400" text-anchor="middle">alpha</text>
+<rect x="70" y="380" width="220" height="80" rx="14" fill="#fffbeb" stroke="#d97706" stroke-width="2"/>
+<text x="180.0" y="416.175" font-size="16" fill="#92400e" font-weight="700" text-anchor="middle">Loki push 수신</text>
+<text x="180.0" y="437.02500000000003" font-size="13" fill="#b45309" font-weight="400" text-anchor="middle">alpha</text>
+<rect x="70" y="480" width="220" height="80" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="180.0" y="516.175" font-size="16" fill="#0f172a" font-weight="700" text-anchor="middle">scrape (prometheus)</text>
+<text x="180.0" y="537.025" font-size="13" fill="#475569" font-weight="400" text-anchor="middle">beta</text>
+<rect x="380" y="300" width="160" height="160" rx="14" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="460.0" y="366.375" font-size="17" fill="#9a3412" font-weight="700" text-anchor="middle">게이트웨이</text>
+<text x="460.0" y="387.95" font-size="13.5" fill="#9a3412" font-weight="400" text-anchor="middle">exporter ×2</text>
+<text x="460.0" y="407.525" font-size="13.5" fill="#9a3412" font-weight="400" text-anchor="middle">(A · B)</text>
+<path d="M290,220 C330,220 340,380 378,380" stroke="#475569" stroke-width="1.6" fill="none" marker-end="url(#m-gray)"/>
+<path d="M290,320 C330,320 340,380 378,380" stroke="#475569" stroke-width="1.6" fill="none" marker-end="url(#m-gray)"/>
+<path d="M290,420 C330,420 340,380 378,380" stroke="#475569" stroke-width="1.6" fill="none" marker-end="url(#m-gray)"/>
+<path d="M290,520 C330,520 340,380 378,380" stroke="#475569" stroke-width="1.6" fill="none" marker-end="url(#m-gray)"/>
+<rect x="590" y="260" width="160" height="90" rx="14" fill="#fffbeb" stroke="#d97706" stroke-width="2"/>
+<text x="670.0" y="301.55" font-size="15" fill="#92400e" font-weight="700" text-anchor="middle">큐 A</text>
+<text x="670.0" y="320.95" font-size="12" fill="#b45309" font-weight="400" text-anchor="middle">file_storage · 배치 단위</text>
+<rect x="590" y="410" width="160" height="90" rx="14" fill="#fffbeb" stroke="#d97706" stroke-width="2"/>
+<text x="670.0" y="451.55" font-size="15" fill="#92400e" font-weight="700" text-anchor="middle">큐 B</text>
+<text x="670.0" y="470.95" font-size="12" fill="#b45309" font-weight="400" text-anchor="middle">file_storage · 배치 단위</text>
+<path d="M540,360 L588,305" stroke="#ea580c" stroke-width="2.2" fill="none" marker-end="url(#m-orange)"/>
+<path d="M540,400 L588,455" stroke="#ea580c" stroke-width="2.2" fill="none" marker-end="url(#m-orange)"/>
+<text x="70" y="620" font-size="14.5" fill="#334155" font-weight="400" text-anchor="start">+ 에이전트와 같은 기술, 부품 하나로 3신호</text>
+<text x="70" y="650" font-size="14.5" fill="#334155" font-weight="400" text-anchor="start">+ tail sampling 같은 트레이스 가공이 있다</text>
+<text x="70" y="680" font-size="14.5" fill="#334155" font-weight="400" text-anchor="start">- Prometheus · Loki 입구가 alpha</text>
+<rect x="820" y="120" width="740" height="600" rx="22" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="844" y="156" font-size="20" fill="#065f46" font-weight="700" text-anchor="start">Victoria 중계 (vmagent · vlagent · vtagent)</text>
+<rect x="850" y="180" width="220" height="80" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="960.0" y="225.6" font-size="16" fill="#0f172a" font-weight="700" text-anchor="middle">OTLP 수신</text>
+<rect x="850" y="280" width="220" height="80" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="960.0" y="316.175" font-size="16" fill="#0f172a" font-weight="700" text-anchor="middle">remote_write · Influx</text>
+<text x="960.0" y="337.02500000000003" font-size="13" fill="#475569" font-weight="400" text-anchor="middle">기본 기능</text>
+<rect x="850" y="380" width="220" height="80" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="960.0" y="416.175" font-size="16" fill="#0f172a" font-weight="700" text-anchor="middle">Loki push · ES bulk</text>
+<text x="960.0" y="437.02500000000003" font-size="13" fill="#475569" font-weight="400" text-anchor="middle">기본 기능</text>
+<rect x="850" y="480" width="220" height="80" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="960.0" y="516.175" font-size="16" fill="#0f172a" font-weight="700" text-anchor="middle">prometheus.yml scrape</text>
+<text x="960.0" y="537.025" font-size="13" fill="#475569" font-weight="400" text-anchor="middle">기본 기능</text>
+<rect x="1160" y="300" width="160" height="160" rx="14" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="1240.0" y="356.5875" font-size="17" fill="#9a3412" font-weight="700" text-anchor="middle">신호별 중계</text>
+<text x="1240.0" y="378.16249999999997" font-size="13.5" fill="#9a3412" font-weight="400" text-anchor="middle">vmagent</text>
+<text x="1240.0" y="397.73749999999995" font-size="13.5" fill="#9a3412" font-weight="400" text-anchor="middle">vlagent</text>
+<text x="1240.0" y="417.3125" font-size="13.5" fill="#9a3412" font-weight="400" text-anchor="middle">vtagent</text>
+<path d="M1070,220 C1110,220 1120,380 1158,380" stroke="#475569" stroke-width="1.6" fill="none" marker-end="url(#m-gray)"/>
+<path d="M1070,320 C1110,320 1120,380 1158,380" stroke="#475569" stroke-width="1.6" fill="none" marker-end="url(#m-gray)"/>
+<path d="M1070,420 C1110,420 1120,380 1158,380" stroke="#475569" stroke-width="1.6" fill="none" marker-end="url(#m-gray)"/>
+<path d="M1070,520 C1110,520 1120,380 1158,380" stroke="#475569" stroke-width="1.6" fill="none" marker-end="url(#m-gray)"/>
+<rect x="1370" y="260" width="160" height="90" rx="14" fill="#fffbeb" stroke="#d97706" stroke-width="2"/>
+<text x="1450.0" y="301.55" font-size="15" fill="#92400e" font-weight="700" text-anchor="middle">큐 A</text>
+<text x="1450.0" y="320.95" font-size="12" fill="#b45309" font-weight="400" text-anchor="middle">목적지별 · 바이트 단위</text>
+<rect x="1370" y="410" width="160" height="90" rx="14" fill="#fffbeb" stroke="#d97706" stroke-width="2"/>
+<text x="1450.0" y="451.55" font-size="15" fill="#92400e" font-weight="700" text-anchor="middle">큐 B</text>
+<text x="1450.0" y="470.95" font-size="12" fill="#b45309" font-weight="400" text-anchor="middle">목적지별 · 바이트 단위</text>
+<path d="M1320,360 L1368,305" stroke="#ea580c" stroke-width="2.2" fill="none" marker-end="url(#m-orange)"/>
+<path d="M1320,400 L1368,455" stroke="#ea580c" stroke-width="2.2" fill="none" marker-end="url(#m-orange)"/>
+<text x="850" y="620" font-size="14.5" fill="#065f46" font-weight="400" text-anchor="start">+ Victoria 공식 HA 방식 · 저장소와 같은 형식으로 보냄</text>
+<text x="850" y="650" font-size="14.5" fill="#065f46" font-weight="400" text-anchor="start">+ 큐 한도를 바이트로 · 남은 바이트로 drain 판단</text>
+<text x="850" y="680" font-size="14.5" fill="#065f46" font-weight="400" text-anchor="start">- 3개 프로세스 · vtagent 는 0.x 신규</text>
+<rect x="40" y="750" width="1520" height="220" rx="16" fill="#fffbeb" stroke="#d97706" stroke-width="1.5"/>
+<text x="64" y="790" font-size="19" fill="#92400e" font-weight="700" text-anchor="start">그래서</text>
+<text x="64" y="828" font-size="15.5" fill="#92400e" font-weight="400" text-anchor="start">· 에이전트는 OTel (OCB), 중계는 Victoria. 에이전트는 서버마다 수집 · 가공을, 중계는 복제 · 버퍼를 맡는다</text>
+<text x="64" y="862" font-size="15.5" fill="#92400e" font-weight="400" text-anchor="start">· 기존 Prometheus · Influx · Loki 형식 수집기가 들어오는 입구가 vmagent · vlagent 에선 기본 기능이다</text>
+<text x="64" y="896" font-size="15.5" fill="#92400e" font-weight="400" text-anchor="start">· 트레이스만은 다시 볼 조건이 있다: vtagent 가 불안하거나 tail sampling 이 필요해지면 트레이스만 OTel 게이트웨이로 바꾼다</text>
+<text x="64" y="930" font-size="15.5" fill="#92400e" font-weight="400" text-anchor="start">  (에이전트는 :4318 그대로라 중앙만 바꾸면 된다)</text>
+</svg>
