@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 . ./versions.env
 target=${1:-all}
 
-ssh_opts=(-i "$SSH_KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10)
+ssh_opts=(-i "$SSH_KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
 [ -n "${JUMP:-}" ] && ssh_opts+=(-J "$JUMP")
 
 deploy_one() { # self peer

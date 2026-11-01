@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 . ./inventory.env
 since=${1:-30}
 
-ssh_opts=(-i "$SSH_KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10)
+ssh_opts=(-i "$SSH_KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
 [ -n "${JUMP:-}" ] && ssh_opts+=(-J "$JUMP")
 
 check_one() { # self peer
