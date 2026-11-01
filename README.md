@@ -16,7 +16,7 @@
 | 양쪽 저장소는 어떻게 같아지나 | 노드마다 있는 **Victoria 중계 에이전트(vmagent · vlagent · vtagent)가 양쪽 저장소에 똑같이 기록**한다. 한쪽이 죽으면 그쪽 몫을 디스크에 쌓았다가 돌아오면 보낸다 (4절) |
 | 에이전트는 | **OCB 로 만든 커스텀 OpenTelemetry Collector** 하나. 공식 부품에 없는 기능(GPU · NPU 수집, 로그 원천 자동 선택, Windows 패킷 트레이스, vSphere, 노드 전환 출력)은 자체 부품으로 만든다 (3.5, 8절) |
 | 중계를 OTel Collector 가 아니라 Victoria 에이전트로 하는 이유 | 기존 Prometheus(remote_write · scrape)와 Influx · Loki 형식 수집기를 받는 입구가 **Victoria 쪽에서는 기본 기능이고 OTel 쪽에서는 alpha** 다. 큐를 바이트 단위로 보고 남은 양으로 조회 복귀를 정하는 공식 HA 절차가 있다 (3.4) |
-| VIP 는 | **쓰지 않는다.** VIP 는 같은 L2 대역 안에서만 넘어간다. 대신 **에이전트가 두 노드 주소를 다 알고, 실패하면 다른 쪽으로** 보낸다. 노드마다 HAProxy 가 있어 로컬 부품이 죽으면 상대 노드로 넘긴다 (3.3) |
+| VIP 는 | **쓰지 않는다.** VIP 는 같은 L2 대역 안에서만 넘어간다. 대신 **에이전트가 두 노드 주소를 다 알고, 실패하면 다른 쪽으로** 보낸다. 노드마다 입구 프록시(vmauth)가 있어 로컬 부품이 죽으면 상대 노드로 넘긴다 (3.3, 3.10) |
 | 노드는 몇 대 | **2대.** 로드밸런서 전용 노드도, split-brain 판정 노드도 없다 (3.9) |
 | 알림은 | **Victoria 계열.** 노드마다 vmalert, Alertmanager 두 대가 클러스터. Grafana 는 쓰지 않는다 (3.8) |
 | Prometheus 와는 | 수집(remote_write 1.0 · OTLP), 조회(Prometheus HTTP API · PromQL), 규칙(Prometheus 형식), Alertmanager 가 그대로 맞는다. 관리 서버가 **두 저장소가 함께 지원하는 것만** 쓰면 메트릭 저장소를 Prometheus ↔ VictoriaMetrics 로 주소만 바꿔 오갈 수 있다 (9절) |
@@ -32,7 +32,7 @@
 | R1 | 양쪽이 다 살아 있는 Active-Active | 노드 2대가 수집 · 중계 · 저장 · 조회 · 알림을 모두 한다 |
 | R2 | 로드밸런싱으로 부하 분산 | 에이전트가 두 노드에 나눠 보내고, 관리 서버가 조회를 나눈다 |
 | R3 | 양쪽 저장소가 항상 같은 내용 | 중계 에이전트의 이중 기록 + 목적지별 디스크 큐 |
-| R4 | HAProxy 로 이중화, L2 에 묶이지 않기 | 노드마다 HAProxy. 진입 주소는 L3(라우팅)만 되면 된다 |
+| R4 | 프록시로 이중화, L2 에 묶이지 않기 | 노드마다 vmauth 입구. 진입 주소는 L3(라우팅)만 되면 된다 |
 | R5 | AI 반도체(NVIDIA · AMD · NPU) 수집 | 에이전트 수신기가 벤더 CLI · 라이브러리를 직접 읽는다 |
 | R6 | 저장소 · 중계 · 알림은 Victoria 계열, Prometheus · OTel 과 호환 | 14.1 호환표, 9절 |
 | R7 | 메트릭 · 로그(journald · syslog · Windows 이벤트 로그) · 트레이스(eBPF · Windows) · vSphere | 에이전트 하나 + 중앙 vSphere 수집기 |
@@ -54,7 +54,7 @@
 | 층 | 무엇 | 어디서 |
 |---|---|---|
 | 수집 | OCB 에이전트 (서버마다 하나), OBI(eBPF 트레이스, 별도 프로세스), 중앙 vSphere 수집기 | 각 서버, 중앙 |
-| 진입 | HAProxy | 노드 A · B 각각 |
+| 진입 | vmauth 하나가 입구 3개(수집 4318 · 조회 8443 · 노드 사이 7443)를 HTTPS 로 받음 | 노드 A · B 각각 |
 | 중계 | vmagent · vlagent · vtagent | 노드 A · B 각각, 양쪽 저장소에 기록 |
 | 저장 | VictoriaMetrics · VictoriaLogs · VictoriaTraces | 노드 A · B 각각, 같은 내용 |
 | 알림 | vmalert, Alertmanager (클러스터) | 노드 A · B 각각 |
@@ -110,21 +110,21 @@
 
 ![L2 VIP 대신 L3](figures/14-l3-ha.svg)
 
-**질문**: keepalived VIP 는 VRRP 라 L2 에서만 동작한다. OpenStack 은 라우터 · 포트 설정을, VMware 는 포트그룹 정책을 따로 봐야 한다. HAProxy 로 L3 까지 고려한 이중화가 되나?
+**질문**: keepalived VIP 는 VRRP 라 L2 에서만 동작한다. OpenStack 은 라우터 · 포트 설정을, VMware 는 포트그룹 정책을 따로 봐야 한다. HAProxy 같은 프록시로 L3 까지 고려한 이중화가 되나?
 
 **답: 된다.** 주소를 하나(VIP)로 모으는 것을 그만두고, **보내는 쪽이 두 노드 주소를 다 알게** 했다. 그러면 라우팅만 되는 어디서나 같은 방식으로 동작한다.
 
 | 후보 | 어떻게 | 얻는 것 | 잃는 것 | 판단 |
 |---|---|---|---|---|
-| ① keepalived VIP (VRRP) | VIP 를 한 노드가 갖고, 그 노드 HAProxy 가 양쪽에 나눈다 | 클라이언트는 주소 하나만 안다 | 두 노드가 같은 L2 여야 한다. OpenStack 은 allowed-address-pairs · VRRP 보안그룹, Floating IP 를 붙이면 DVR · OVN 에서 문제 보고가 있다. VMware 는 포트그룹 보안 정책을, NSX 는 세그먼트 정책을 따로 본다. 2노드 split-brain 판정 노드가 필요하다. VIP 자체는 Active-Standby 다 | 탈락 |
-| **② 보내는 쪽이 주소 2개 + 노드마다 HAProxy** (선택) | 에이전트 출력에 노드 A · B 주소를 둘 다 넣는다. 보내다 실패하면 다른 주소로 보낸다. 각 노드의 HAProxy 는 로컬 중계를 먼저 쓰고, 로컬이 죽었으면 상대 노드 중계로 보낸다 | 라우팅만 되면 다른 대역 · 다른 사이트 · OpenStack · VMware · 베어메탈 구분 없이 같다. 두 노드가 늘 같이 일한다. 넘겨줄 주소가 없어 split-brain 이 없다. 플랫폼 설정이 필요 없다 | 에이전트가 주소를 2개 알아야 한다. 에이전트에 주소 전환 exporter 를 만든다 (8.1). 노드 주소가 바뀌면 설정을 다시 내린다 | **선택** |
+| ① keepalived VIP (VRRP) | VIP 를 한 노드가 갖고, 그 노드의 프록시가 양쪽에 나눈다 | 클라이언트는 주소 하나만 안다 | 두 노드가 같은 L2 여야 한다. OpenStack 은 allowed-address-pairs · VRRP 보안그룹, Floating IP 를 붙이면 DVR · OVN 에서 문제 보고가 있다. VMware 는 포트그룹 보안 정책을, NSX 는 세그먼트 정책을 따로 본다. 2노드 split-brain 판정 노드가 필요하다. VIP 자체는 Active-Standby 다 | 탈락 |
+| **② 보내는 쪽이 주소 2개 + 노드마다 입구 프록시** (선택) | 에이전트 출력에 노드 A · B 주소를 둘 다 넣는다. 보내다 실패하면 다른 주소로 보낸다. 각 노드의 입구 프록시(vmauth)는 로컬 중계를 먼저 쓰고, 로컬이 죽었으면 상대 노드 중계로 보낸다 | 라우팅만 되면 다른 대역 · 다른 사이트 · OpenStack · VMware · 베어메탈 구분 없이 같다. 두 노드가 늘 같이 일한다. 넘겨줄 주소가 없어 split-brain 이 없다. 플랫폼 설정이 필요 없다 | 에이전트가 주소를 2개 알아야 한다. 에이전트에 주소 전환 exporter 를 만든다 (8.1). 노드 주소가 바뀌면 설정을 다시 내린다 | **선택** |
 | ③ DNS 이름 하나에 IP 2개 | 에이전트가 이름으로 보낸다 | 설정이 짧다 | 현장마다 DNS 를 우리가 관리한다는 보장이 없다. 일반 DNS 는 죽은 노드를 빼지 않는다 | 보조. 사람이 쓰는 이름에만 |
 | ④ BGP anycast (FRR · BIRD) | 두 노드가 같은 /32 주소를 라우터에 광고한다 | 주소 하나로 L3 이중화 | 망 담당과 라우터 협조가 필요하다. OpenStack VM 이 Neutron 라우터와 BGP 를 맺는 공식 방법은 찾지 못했다(neutron-dynamic-routing 은 바깥 라우터로 광고만 한다). NSX T0 는 BGP 이웃을 받지만 워크로드 VM 이 직접 맺는 문서는 찾지 못했다 | 현장에 있으면 ② 앞에 덧붙임 |
 | ⑤ 플랫폼 로드밸런서 (Octavia, NSX ALB) | 플랫폼이 VIP 와 헬스 체크를 관리 | 우리가 VRRP 를 운영하지 않는다 | 플랫폼마다 설정이 다르다. Octavia OVN 프로바이더는 TCP · UDP 만, NSX 기본 LB 는 Avi(NSX ALB, 상용)로 넘어가는 중이다 | 현장에 있으면 ② 앞에 덧붙임 |
 
 **고른 이유**
 - 요구는 "L2 에 묶이지 않는 완벽한 이중화" 다. ②는 **에이전트와 노드 사이에 IP 라우팅만** 요구한다.
-- **진짜 Active-Active 다.** VIP 방식은 VIP 를 가진 노드의 HAProxy 하나가 모든 진입을 받는다. ②는 에이전트가 처음부터 두 노드에 나눠 보낸다.
+- **진짜 Active-Active 다.** VIP 방식은 VIP 를 가진 노드의 프록시 하나가 모든 진입을 받는다. ②는 에이전트가 처음부터 두 노드에 나눠 보낸다.
 - **에이전트를 우리가 빌드하므로** 주소 전환을 에이전트에 넣는 비용이 작다 (8.1 `cmpotlp`).
 - ④ · ⑤는 현장 망 · 플랫폼에 기대므로 기본으로 두지 않는다. 현장에 이미 있으면 ② 앞에 붙여 주소 하나로도 쓸 수 있다.
 
@@ -156,7 +156,7 @@
 **정리하면**
 - 에이전트(서버마다): 수집과 가공 → **OTel(OCB)**. 서버에서 무엇을 어떻게 읽는지가 중요한 자리다.
 - 중계(중앙 2곳): 복제와 버퍼, 그리고 Prometheus 생태계의 입구 → **Victoria**. 저장소와 같은 방식이라 큐 · 복구 · 중복 제거 절차가 문서로 맞물린다.
-- **다시 볼 조건 (트레이스만)**: vtagent 가 PoC 에서 불안하거나 tail sampling 이 필요해지면 트레이스만 OTel 게이트웨이로 바꾼다. 에이전트는 `:4318` 그대로라 중앙 HAProxy 의 `/v1/traces` 행선지만 바꾸면 된다.
+- **다시 볼 조건 (트레이스만)**: vtagent 가 PoC 에서 불안하거나 tail sampling 이 필요해지면 트레이스만 OTel 게이트웨이로 바꾼다. 에이전트는 `:4318` 그대로라 중앙 vmauth 의 `/v1/traces` 행선지만 바꾸면 된다.
 
 ### 3.5 각 서버에 깔 에이전트 - OCB 커스텀 OTel Collector
 
@@ -217,10 +217,10 @@
 
 | 후보 | 판단 |
 |---|---|
-| **관리 서버가 두 노드 주소를 알고 나눠 조회 + 노드별 HAProxy (선택)** | 수집과 같은 원칙이다. 조회 입구는 노드마다 `:8443` 하나다. 조회하는 쪽이 관리 서버 · vmalert 정도라 주소 2개를 아는 것이 어렵지 않다 |
-| vmauth (Victoria 의 조회 라우터) | 기능은 충분하지만 HAProxy 와 같은 일을 하는 부품이 하나 더 생긴다 |
+| **관리 서버가 두 노드 주소를 알고 나눠 조회 + 노드마다 vmauth 입구 (선택)** | 수집과 같은 원칙이다. 조회 입구는 노드마다 `:8443` 하나다. 조회하는 쪽이 관리 서버 · vmalert 정도라 주소 2개를 아는 것이 어렵지 않다. vmauth 는 Victoria 문서가 조회 경로 앞단에 권하는 부품이다 |
+| 공용 로드밸런서 하나 | 그것이 또 하나의 단일 장애점이 되고, 이중화하려면 다시 VIP 가 필요하다 |
 
-**지켜야 할 규칙**: **복구된 노드는 큐를 다 받을 때까지 조회에서 뺀다.** Victoria 문서도 "버퍼가 다 전송된 뒤에 조회를 받게 한다" 고 적는다. 각 노드 HAProxy 의 `agent-check` 가 상대 노드 중계의 미전송 바이트 지표를 보고, 0 이 될 때까지 로컬 저장소를 `drain` 으로 둔다. 그동안 그 노드로 온 조회는 상대 노드 저장소가 답한다.
+**지켜야 할 규칙**: **복구된 노드는 큐를 다 받을 때까지 조회에서 빼야 한다.** Victoria 문서도 "버퍼가 다 전송된 뒤에 조회를 받게 한다" 고 적는다. vmauth 는 백엔드를 주기적으로 검사하지 않고 실패한 요청으로만 장애를 알아채므로(3.10), 이 판단은 관리 서버가 한다: 상대 노드 중계의 미전송 바이트 지표(`vmagent_remotewrite_pending_data_bytes` 등)가 0 이 될 때까지 복구된 노드에는 조회를 보내지 않는다. **아직 구현하지 않았다** (PoC 에서 정한다).
 
 ### 3.8 알림 - Victoria 계열로
 
@@ -245,7 +245,7 @@
 - **Prometheus 규칙 형식과 맞는다.** 다만 `eval_delay`, `concurrency`, `limit` 같은 vmalert 전용 필드와 MetricsQL 확장 함수를 쓰면 Prometheus 에서 그대로 안 돈다. 9.2 의 "오갈 수 있게" 를 지키려면 규칙에서 이것들을 쓰지 않는다.
 - **라이선스**: vmalert Apache-2.0, Alertmanager Apache-2.0.
 
-**확인 필요**: 한 vmalert 가 메트릭 규칙과 로그 규칙을 함께 평가하려면 데이터소스를 경로로 나눠야 한다. 로컬 HAProxy 가 경로(`/api/v1/*` → VictoriaMetrics, `/select/logsql/*` → VictoriaLogs)로 나눠 주는 것으로 잡았다. PoC 에서 본다.
+**확인 필요**: 한 vmalert 가 메트릭 규칙과 로그 규칙을 함께 평가하려면 데이터소스를 경로로 나눠야 한다. 로컬 vmauth 가 경로(`/metrics/...` → VictoriaMetrics, `/metrics/select/logsql/...` → VictoriaLogs)로 나눠 주는 것으로 잡았다. PoC 에서 본다.
 
 ### 3.9 노드는 몇 대인가
 
@@ -253,13 +253,30 @@
 
 | 역할 | 어디서 |
 |---|---|
-| 수집 받기 · 분배 (HAProxy) | 노드 A · B 각각. 서로 상대를 backup 으로 둔다 |
+| 입구 (vmauth) | 노드 A · B 각각. 로컬 부품을 먼저 쓰고, 죽었으면 상대 노드로 넘긴다 |
 | 중계 (vmagent · vlagent · vtagent) | 노드 A · B 각각. 각자 양쪽 저장소에 기록 |
 | 저장 (Victoria 3종) | 노드 A · B 각각. 같은 내용 |
 | 알림 (vmalert · Alertmanager) | 노드 A · B 각각. Alertmanager 둘이 클러스터 |
 | split-brain 판정 | **필요 없다.** 넘겨줄 VIP 가 없다 |
 
-로드밸런서를 따로 두면 그것이 또 하나의 단일 장애점이 되고, 그것을 이중화하려면 다시 VIP 가 필요해진다. 그래서 HAProxy 를 각 노드에 두고 에이전트가 두 노드를 다 알게 했다.
+로드밸런서를 따로 두면 그것이 또 하나의 단일 장애점이 되고, 그것을 이중화하려면 다시 VIP 가 필요해진다. 그래서 입구 프록시(vmauth)를 각 노드에 두고 에이전트가 두 노드를 다 알게 했다.
+
+### 3.10 입구 프록시 - HAProxy 대신 vmauth
+
+각 노드의 입구(수집 · 조회 · 노드 사이)를 맡는 프록시로 HAProxy 와 vmauth 를 비교했다. PoC 에서 처음에는 HAProxy 로 구성했다가 vmauth 로 바꿨다.
+
+| 비교 | HAProxy (배포판 RPM) | **vmauth (선택)** |
+|---|---|---|
+| 배포 | 배포판마다 다른 패키지, 동적 링크 | **정적 Go 바이너리.** 이미 쓰는 vmutils 안에 있다. 설치 폴더 아래에 그대로 둔다 |
+| SELinux | `haproxy_t` 에 갇힌다. **PoC(Rocky 10.2)에서 `haproxy_connect_any` 없이는 4318 · 7443 을 열지 못하고 시작에 실패했다.** 이 거부는 AVC 로도 남지 않았다 | 다른 Victoria 부품처럼 `unconfined_service_t` 로 돈다. 불리언이 필요 없다 (PoC 에서 AVC 0건) |
+| 경로로 나누기 · 앞말 떼기 | 된다 | 된다 (`src_paths`, `drop_src_path_prefix_parts`) |
+| 로컬 먼저, 죽으면 상대 노드 | 된다 (`backup`, `nbsrv`) | 된다 (`load_balancing_policy: first_available`) |
+| 상태 검사 | 주기적으로 검사한다 | **실패한 요청으로만 알아챈다** (`-failTimeout`). 첫 실패 요청은 다음 백엔드로 다시 보낸다 (`retry_status_codes`) |
+| HTTPS | 된다 | 된다 (`-tls`, PoC 에서 확인) |
+| 출발지 IP 제한 | 된다 | **Enterprise 전용**(`ip_filters`). 그래서 경로를 토큰으로 막는다 (5.4) |
+| 유지 | 배포판이 패치 | Victoria 릴리스와 같이 올린다. Apache-2.0 |
+
+**고른 이유**: 설치 폴더 하나에 정적 바이너리만 두는 원칙(8.3)과 맞고, SELinux 를 따로 풀 필요가 없다. 출발지 제한이 없는 것은 토큰과 OS 방화벽으로 메운다.
 
 ---
 
@@ -325,18 +342,18 @@
 
 ---
 
-## 5. 포트
+## 5. 입구와 포트
 
 ![노드마다 같은 포트 지도](figures/05-port-map.svg)
 
-**바깥에 여는 포트는 넷이다.** 부품마다 포트를 열지 않고 HAProxy 한 곳으로 모아 경로로 나눈다. 부품은 모두 `127.0.0.1` 에서만 듣는다. 두 노드의 설정이 같고, 다른 것은 자기 주소와 상대 주소뿐이다.
+**vmauth 하나가 바깥 포트 셋을 HTTPS 로 받는다.** 나머지 부품은 모두 `127.0.0.1` 에서만 듣는다. 두 노드의 설정이 같고, 다른 것은 자기 주소와 상대 주소뿐이다.
 
-| 바깥 포트 | 누가 쓰나 | 경로 → 부품 | 방화벽에서 열 출발지 |
-|---|---|---|---|
-| **4318** 수집 | 에이전트 · 앱 · 기존 Prometheus | `/v1/metrics` → vmagent, `/v1/logs` → vlagent, `/v1/traces` → vtagent, `/api/v1/write` → vmagent | 에이전트가 있는 대역 |
-| **8443** 조회 | 관리 서버 · vmalert | `/metrics/...` → VictoriaMetrics, `/logs/...` → VictoriaLogs, `/traces/...` → VictoriaTraces (앞부분을 떼고 넘긴다) | 관리 서버 |
-| **7443** 노드 사이 | 상대 노드만 | `/vm` · `/vl` · `/vt` → 저장소, `/vmagent` · `/vlagent` · `/vtagent` → 중계, `/am` → Alertmanager | 상대 노드 (HAProxy 에서도 출발지를 막는다) |
-| **9094** (TCP · UDP) | 상대 Alertmanager | Alertmanager 클러스터 상태 맞추기. UDP 라 HAProxy 로 묶지 않는다 | 상대 노드 |
+| 바깥 포트 | 누가 쓰나 | 경로 → 부품 | 필요한 토큰 | 방화벽에서 열 출발지 |
+|---|---|---|---|---|
+| **4318** 수집 | 에이전트 · 앱 · 기존 Prometheus | `/v1/metrics` → vmagent, `/v1/logs` → vlagent, `/v1/traces` → vtagent, `/api/v1/write` → vmagent | 없음 | 에이전트가 있는 대역 |
+| **8443** 조회 | 관리 서버 · vmalert | `/metrics/...` → VictoriaMetrics, `/logs/...` → VictoriaLogs, `/traces/...` → VictoriaTraces (앞말을 떼고 넘긴다) | 조회 토큰 | 관리 서버 |
+| **7443** 노드 사이 | 상대 노드만 | `/vm` · `/vl` · `/vt` → 저장소, `/vmagent` · `/vlagent` · `/vtagent` → 중계, `/am` → Alertmanager | 노드 사이 토큰 | 상대 노드 |
+| **9094** (TCP · UDP) | 상대 Alertmanager | Alertmanager 클러스터 상태 맞추기. UDP 라 vmauth 로 묶지 않는다 | - | 상대 노드 |
 
 **노드 안에서만 쓰는 포트** (`127.0.0.1`)
 
@@ -344,20 +361,13 @@
 |---|---|---|
 | VictoriaMetrics · VictoriaLogs · VictoriaTraces | 8428 · 9428 · 10428 | 저장 · 조회 |
 | vmagent · vlagent · vtagent | 8429 · 9429 · 10429 | 중계. 로컬 저장소와 상대 노드 `:7443/vm` 등에 복제 |
-| vmalert | 8880 | 규칙 평가. 데이터소스는 `:8443/metrics`, 기록은 `:4318/api/v1/write` |
+| vmalert | 8880 | 규칙 평가. 데이터소스 `https://자기:8443/metrics`, 기록 `https://자기:4318/api/v1/write` |
 | Alertmanager | 9093 | 상대 vmalert 는 `:7443/am` 으로 들어온다 |
+| vmauth 자체 | 8427 | vmauth 의 상태 · 지표 · 재적재. 바깥 포트에서는 열지 않는다 |
 
-**로컬 먼저, 죽으면 상대 노드로**: HAProxy 는 서버마다 경로를 바꿀 수 없어서, 로컬 백엔드와 상대 노드(`:7443`) 백엔드를 나누고 로컬에 살아 있는 서버가 없을 때(`nbsrv` 가 0)만 상대 쪽을 쓴다.
+**로컬 먼저, 죽으면 상대 노드로**: 경로마다 백엔드 목록을 `[로컬, 상대 노드 :7443/...]` 순서로 두고 `first_available` 로 쓴다. 로컬로 보낸 요청이 연결 실패나 502 · 503 · 504 로 끝나면 같은 요청을 상대 노드로 다시 보낸다.
 
-**좋은 점**
-- 에이전트 쪽 방화벽은 4318 하나, 관리 서버 쪽은 8443 하나만 열면 된다.
-- 부품이 바깥에 직접 노출되지 않는다. TLS 와 출발지 제한을 HAProxy 한 곳에서 건다.
-
-**알고 써야 할 점**
-- 노드 사이 복제도 HAProxy 를 거친다. 한 노드의 HAProxy 가 죽으면 상대 노드는 그 노드에 기록하지 못하고 큐에 쌓는다. 그 노드가 반쯤 죽은 것과 같은 상황이라 6절의 장애 처리 안에 들어간다.
-- 노드 사이까지 암호화가 꼭 필요한 현장은 두 노드 사이를 WireGuard 같은 터널로 묶는 것을 더할 수 있다. 에이전트는 수가 많아 터널을 맺게 하지 않는다.
-
-설정 초안은 부록 A 에 있고, PoC 에서 실제로 쓰는 것은 `poc/` 에 있다.
+**한 프로세스로 받는 이유**: 서비스가 하나라 관리가 쉽다. 대신 설정이 하나라 경로가 세 포트에 모두 열리므로, **누가 어느 경로를 쓸 수 있는지는 토큰으로 가른다** (5.4). vmauth 가 죽으면 세 입구가 같이 멈추지만, 수집은 에이전트가 상대 노드로, 조회는 관리 서버가 상대 노드로 넘어가므로 노드 하나가 죽은 것과 같다.
 
 ### 5.1 노드 사이 상세 구조
 
@@ -365,7 +375,7 @@
 
 | 흐름 | 지나가는 길 |
 |---|---|
-| 에이전트 → 저장소 | 에이전트 → 노드 A `:4318` (HAProxy) → `127.0.0.1:8429` vmagent → ① `127.0.0.1:8428` VictoriaMetrics, ② 노드 B `:7443/vm` → B 의 `127.0.0.1:8428` |
+| 에이전트 → 저장소 | 에이전트 → 노드 A `:4318` (vmauth) → `127.0.0.1:8429` vmagent → ① `127.0.0.1:8428` VictoriaMetrics, ② 노드 B `:7443/vm` → B 의 `127.0.0.1:8428` |
 | 노드 A 의 중계가 죽었을 때 | 에이전트 → 노드 A `:4318` → (로컬 vmagent 가 없음) → 노드 B `:7443/vmagent` → B 의 vmagent → 양쪽 저장소 |
 | 노드 A 가 통째로 죽었을 때 | 에이전트가 다음 주소(노드 B `:4318`)로 보낸다. B 의 중계는 A 몫을 디스크 큐에 쌓는다 |
 | 관리 서버 → 조회 | 노드 A `:8443/metrics/...` → 앞부분을 떼고 `127.0.0.1:8428`. 로컬 저장소가 죽었으면 노드 B `:7443/vm` |
@@ -376,7 +386,7 @@
 
 ### 5.2 8443 과 7443 은 각각 무엇을 하나
 
-**8443 (조회 입구)**: HAProxy 가 경로 앞부분으로 저장소를 고르고, 앞부분을 떼고 노드 안의 `127.0.0.1` 저장소로 넘긴다. 로컬 저장소가 죽어 있으면 같은 요청을 상대 노드 `:7443/vm` 등으로 넘긴다.
+**8443 (조회 입구)**: vmauth 가 조회 토큰을 확인하고, 경로 앞부분으로 저장소를 고르고, 앞부분을 떼고 노드 안의 `127.0.0.1` 저장소로 넘긴다. 로컬 저장소가 죽어 있으면 같은 요청을 상대 노드 `:7443/vm` 등으로 넘긴다.
 
 | 들어온 경로 | 넘기는 곳 | 실제로 가는 경로 |
 |---|---|---|
@@ -385,13 +395,13 @@
 | `/traces/select/jaeger/api/...` | VictoriaTraces `127.0.0.1:10428` | `/select/jaeger/api/...` |
 | `/metrics/select/logsql/...` | VictoriaLogs | vmalert 가 데이터소스 주소를 `/metrics` 하나로 쓰기 때문에 둔 예외 |
 
-**7443 (노드 사이 입구)**: 상대 노드만 부르는 문이다. 상대 노드 IP 가 아니면 HAProxy 가 403 으로 막는다. 경로의 첫 조각으로 노드 안의 부품을 고르고, 그 조각을 떼고 넘긴다.
+**7443 (노드 사이 입구)**: 상대 노드만 부르는 문이다. 노드 사이 토큰이 없으면 vmauth 가 거부한다 (출발지 IP 제한은 OS 방화벽 · 보안그룹으로). 경로의 첫 조각으로 노드 안의 부품을 고르고, 그 조각을 떼고 넘긴다.
 
 | 누가 부르나 | 왜 | 경로 → 받는 부품 |
 |---|---|---|
 | 상대 노드의 중계(vmagent · vlagent · vtagent) | **평소 복제.** 같은 데이터를 이 노드 저장소에도 쓴다 | `/vm/api/v1/write` → VictoriaMetrics, `/vl/insert/native` → VictoriaLogs, `/vt/insert/native` → VictoriaTraces |
-| 상대 노드의 HAProxy :4318 | 상대 노드의 중계가 죽었을 때 수집 예비 | `/vmagent/...` · `/vlagent/...` · `/vtagent/...` → 이 노드의 중계 |
-| 상대 노드의 HAProxy :8443 | 상대 노드의 저장소가 죽었을 때 조회 예비 | `/vm/...` · `/vl/...` · `/vt/...` → 이 노드의 저장소 |
+| 상대 노드의 vmauth :4318 | 상대 노드의 중계가 죽었을 때 수집 예비 | `/vmagent/...` · `/vlagent/...` · `/vtagent/...` → 이 노드의 중계 |
+| 상대 노드의 vmauth :8443 | 상대 노드의 저장소가 죽었을 때 조회 예비 | `/vm/...` · `/vl/...` · `/vt/...` → 이 노드의 저장소 |
 | 상대 노드의 vmalert | 알림을 두 Alertmanager 에 모두 보내기 | `/am/api/v2/alerts` → 이 노드의 Alertmanager |
 
 ### 5.3 평소 복제는 누가 하나
@@ -404,6 +414,80 @@
 - 그래서 "양쪽이 같다" 는 보장은 중계와 그 큐에서 나온다. 저장소 쪽에서 맞춰 주는 것은 없다. 큐 한도를 넘는 장애는 사람이 보충해야 하는 이유다.
 - 저장소 클러스터의 복제 기능(VictoriaMetrics 클러스터의 `replicationFactor`)을 쓰지 않은 이유는 3.1절에 있다. 로그 · 트레이스는 저장소 쪽 복제 기능이 없어서, 세 신호를 같은 방식으로 맞추려면 중계가 맡아야 한다.
 
+### 5.4 HTTPS 와 토큰
+
+**HTTPS**: 바깥 포트 셋은 모두 HTTPS 다. 설치할 때 작은 사설 CA 를 만들고, 그 CA 로 서명한 서버 인증서(SAN 에 두 노드 IP)를 두 노드에 같이 넣는다. 받는 쪽은 둘 중 하나를 고른다 (`TLS_VERIFY`).
+
+| 방식 | 받는 쪽 설정 | 막는 것 |
+|---|---|---|
+| `skip` (PoC 기본) | 인증서를 검증하지 않는다 (`tlsInsecureSkipVerify`) | 엿보기 |
+| `ca` | 사설 CA 파일로 검증한다 (`tlsCAFile`) | 엿보기, 다른 서버가 노드인 척하기 |
+
+인증서 하나로 스스로 서명한 인증서는 CA 로 검증하면 거부된다(PoC 에서 curl 오류 60). 그래서 CA 와 서버 인증서를 나눴다.
+
+**토큰**: 요청 헤더 `Authorization: Bearer <토큰>` 으로 보내는 긴 비밀 문자열이다. vmauth 는 토큰에 따라 열어 주는 경로가 다르다.
+
+| 토큰 | 붙여 보내는 쪽 | 열리는 경로 |
+|---|---|---|
+| 없음 | 에이전트 · 앱 · 기존 Prometheus | 수집 경로만 |
+| 조회 토큰 | 관리 서버, vmalert | `/metrics` · `/logs` · `/traces` |
+| 노드 사이 토큰 | 두 노드의 중계 · vmalert · vmauth | `/vm` · `/vl` · `/vt` · `/vmagent` · `/vlagent` · `/vtagent` · `/am` |
+
+- 토큰이 없으면 노드 사이 경로로 저장소에 바로 써서 복제를 건너뛸 수 있다. 토큰이 이것을 막는다.
+- 중계는 목적지가 둘(로컬 · 상대)이라 토큰 · TLS 옵션을 목적지 순서대로 준다 (`-remoteWrite.bearerTokenFile=,<토큰 파일>`: 로컬은 비우고 상대에만).
+- 토큰과 인증서는 배포할 때 한 번 만들어 두 노드에 같은 것을 넣는다. 저장소에는 넣지 않는다. 노드에서는 root 와 서비스 계정만 읽는다.
+- PoC 에서 확인한 것: 조회 토큰 없이 401, 조회 토큰으로 노드 사이 경로를 부르면 거부(400).
+
+### 5.5 설치 위치와 폴더 구조
+
+**한 폴더 아래에 모두 둔다.** 기본은 `/cmp-mon` 이고 설치할 때 바꿀 수 있다 (`BASE_DIR`). 서비스 이름 앞말과 실행 계정도 같은 이름(`NAME`, 기본 `cmp-mon`)을 따른다.
+
+```
+/cmp-mon                     기준 폴더 (BASE_DIR)
+├── bin/                     정적 바이너리 (victoria-*, vm*, vl*, vt*, vmauth, alertmanager)
+├── conf/
+│   ├── env                  노드마다 다른 값 (자기 · 상대 주소, 단일/이중화, 인자)
+│   ├── install.env          지울 때 쓰는 설치 정보
+│   ├── gateway.yml          vmauth 경로 · 토큰 (root 와 서비스 계정만 읽음)
+│   ├── scrape.yml           노드 자체 감시
+│   ├── alertmanager.yml
+│   ├── rules/               vmalert 규칙
+│   ├── tls/                 ca.pem · server.pem · server.key
+│   └── tokens/              peer.token · query.token
+├── data/
+│   ├── victoria-metrics/    저장소 데이터
+│   ├── victoria-logs/
+│   ├── victoria-traces/
+│   ├── vmagent-queue/       중계 디스크 큐 (목적지별: 1_ 로컬, 2_ 상대 노드)
+│   ├── vlagent-queue/
+│   ├── vtagent-queue/
+│   └── alertmanager/
+└── logs/                    서비스마다 로그 파일 하나 (logrotate 로 7일)
+```
+
+| 항목 | 기본 | 바꾸는 법 |
+|---|---|---|
+| 기준 폴더 | `/cmp-mon` | `BASE_DIR` |
+| 서비스 이름 | `cmp-mon-vmagent` 등 | `NAME` |
+| 실행 계정 | `cmp-mon` | `SERVICE_USER`. **이미 있는 계정이면 만들지 않고 그대로 쓴다.** 지울 때도 우리가 만든 계정만 지운다 |
+
+폴더 밖에 두는 것은 systemd 유닛(`/etc/systemd/system/cmp-mon-*.service`), logrotate 설정(`/etc/logrotate.d/cmp-mon`), SELinux 라벨 모듈(8.3) 셋뿐이다.
+
+### 5.6 단일 노드 · 이중화 전환
+
+같은 설치물로 단일 노드와 이중화를 모두 만든다. 차이는 상대 노드 주소가 있는지 하나다.
+
+| | 단일 노드 | 이중화 |
+|---|---|---|
+| 중계 목적지 | 로컬 저장소 하나 | 로컬 + 상대 노드 |
+| vmauth 경로 | 수집 · 조회만 | 수집 · 조회 · 노드 사이 |
+| Alertmanager | 클러스터 없음 | 두 대 클러스터 |
+| 바깥 포트 | 4318 · 8443 | 4318 · 8443 · 7443 · 9094 |
+
+- **단일 → 이중화**: 상대 노드를 정해 두 노드에 다시 설치한다. 새 노드에는 그 시점부터 데이터가 쌓인다. 과거 메트릭은 `vmctl` 로 기존 노드에서 복사한다(`poc/bin/backfill-metrics.sh`). 로그 · 트레이스의 과거 데이터 복사는 아직 정하지 않았다. 다 채울 때까지 새 노드에는 조회를 보내지 않는다.
+- **이중화 → 단일**: 상대 노드 없이 남길 노드에 다시 설치한다. 상대 노드로 보내던 큐(`2_` 로 시작)는 지운다. 빠지는 노드는 지우기 스크립트로 정리한다.
+- PoC 에서 이중화 → 단일 전환을 해 봤다 (11.1).
+
 ---
 
 ## 6. 장애가 나면
@@ -415,8 +499,8 @@
 | ① 평상시 | 에이전트 절반은 A 먼저, 절반은 B 먼저 | 양쪽 같은 내용 | 관리 서버가 양쪽에 나눔 | 없음 |
 | ② 노드 A 장애 | A 먼저였던 에이전트가 B 로 바꿔 보낸다. 끊기는 시간은 재시도 간격. 그동안 에이전트 디스크 큐가 받는다 | B 만 기록. B 의 중계가 A 몫을 큐에 쌓음 | B 만 | A 복구 후 큐가 비는 것만 확인 |
 | ③ 노드 사이 단절 | 각자 받는다. VIP 가 없으니 split-brain 이 없다 | 각자 상대 몫을 큐에 쌓음. 단절 동안 두 저장소가 잠시 다르다 | 한 노드에 고정 | 연결 복구 후 큐 확인 |
-| ④ 노드 A 의 중계만 죽음 | 에이전트는 모른다. A 의 HAProxy 가 B 의 중계로 보낸다 | B 의 중계가 양쪽에 계속 기록 | 영향 없음 | 프로세스 재시작 |
-| ⑤ 저장소만 죽음 | 영향 없음 | 양쪽 중계가 그 저장소 몫을 큐에 쌓음 | 그 노드 HAProxy 가 상대 저장소로 | 저장소 재시작 |
+| ④ 노드 A 의 중계만 죽음 | 에이전트는 모른다. A 의 vmauth 가 B 의 중계로 보낸다 | B 의 중계가 양쪽에 계속 기록 | 영향 없음 | 프로세스 재시작 |
+| ⑤ 저장소만 죽음 | 영향 없음 | 양쪽 중계가 그 저장소 몫을 큐에 쌓음 | 그 노드 vmauth 가 상대 저장소로 | 저장소 재시작 |
 | ⑥ vmalert · Alertmanager 한쪽 | 영향 없음 | 영향 없음 | 영향 없음 | 남은 쪽이 같은 규칙으로 알림을 계속 보낸다 |
 
 ---
@@ -489,10 +573,12 @@
 **SELinux (RHEL · Rocky 등 enforcing)**
 - **처음 나오는 말**: SELinux 는 파일과 프로세스에 라벨(type)을 붙이고 라벨끼리 무엇을 허용할지 정책으로 정한다. `bin_t` 는 실행 파일 라벨, `unconfined_service_t` 는 정책 제약을 거의 받지 않는 서비스 도메인이다.
 - 실행 파일을 `bin_t` 로 라벨링하면 systemd 가 그 서비스를 `unconfined_service_t` 로 띄운다 (Red Hat 의 Dan Walsh 설명, RHEL 7 SELinux 가이드). 그러면 로그 읽기 · 벤더 CLI 실행이 정책에 막히지 않는다. **실제로 AVC(거부 기록)가 0건인지는 PoC 에서 `ausearch -m avc` 로 본다.**
-- 라벨은 `chcon` 으로 붙이지 않는다. `chcon` 은 전체 재라벨링(`restorecon -R`, `/.autorelabel`) 때 정책 기본값으로 돌아간다. **`semanage fcontext -a -t bin_t '<설치경로>/bin(/.*)?'` 로 규칙을 등록하고 `restorecon` 한다.** `semanage`(policycoreutils-python-utils) 가 없는 OS 만 `chcon` 으로 둔다.
+- 라벨은 `chcon` 으로 붙이지 않는다. `chcon` 은 전체 재라벨링(`restorecon -R`, `/.autorelabel`) 때 정책 기본값으로 돌아간다.
+- `semanage` 도 쓰지 않는다. `semanage` 는 `policycoreutils-python-utils` 패키지에 있어 **없는 서버가 있다.** 대신 라벨 규칙을 담은 작은 **CIL 정책 모듈**을 만들어, SELinux 를 쓰면 늘 있는 `semodule` 로 넣는다. 재라벨링해도 유지되고, 지울 때 `semodule -r` 로 뺀다. 설치 폴더(5.5)의 하위 폴더마다 라벨을 준다: `bin` 은 `bin_t`, `conf` 는 `etc_t`, `data` 는 `var_lib_t`, `logs` 는 `var_log_t`.
+- 정책 기본값만으로 되는 위치도 있다. `/opt/<이름>/bin` 은 기본 정책이 처음부터 `bin_t` 로 잡는다. `/cmp-mon` 같은 위치는 기본값이 `default_t` 라서 모듈이 필요하다.
 - 컨테이너를 안 쓰므로 `container_t` · `/dev/nvidia*` 장치 라벨(`xserver_misc_device_t`) · `:z` 마운트 문제가 생기지 않는다.
 - OBI 는 별도 프로세스로 root 또는 CAP_BPF · PERFMON 등을 준다. 에이전트 본체는 높은 권한이 필요 없다. SELinux 가 BPF 로드를 막는지는 공식 문서에 언급이 없어 PoC 에서 본다.
-- **중앙 노드의 HAProxy**: 배포판 패키지의 HAProxy 는 SELinux 의 `haproxy_t` 도메인에 갇힌다. **PoC(Rocky 10.2, Enforcing)에서 확인했다**: 허용 없이 띄우면 4318 · 7443 · 8404 를 열지 못하고(`cannot bind socket (Permission denied)`) 시작이 실패한다. 8443 은 정책에 웹 포트(`http_port_t`)로 등록돼 있어 열린다. 이 거부는 AVC 로 남지 않았다(기록하지 않는 dontaudit 규칙 때문으로 보지만 확인하지 않았다). `haproxy_connect_any` 를 켜면 모두 열리고 AVC 는 0건이다. 포트를 하나씩 `semanage port -a -t http_port_t` 로 등록하는 방법도 있다(더 좁은 허용).
+- **입구 프록시**: 배포판 HAProxy 는 `haproxy_t` 도메인에 갇혀 `haproxy_connect_any` 없이는 4318 · 7443 을 열지 못했다(PoC). 그래서 입구를 정적 바이너리 vmauth 로 바꿨다(3.10). vmauth 는 다른 부품처럼 `unconfined_service_t` 로 돈다.
 
 ### 8.4 vSphere 수집
 
@@ -582,11 +668,11 @@
 | 1 | 노드 A 전원 차단 | `cmpotlp` 가 B 로 넘어가고 끊김이 재시도 간격 안. 메트릭 · 로그 · 트레이스 빈틈 0 (file_storage 큐) |
 | 2 | 노드 B 1시간 정지 후 복구 | 큐가 자동으로 비고, 같은 구간의 메트릭 샘플 수 · 로그 건수 · 트레이스 수가 A · B 에서 같다. 한 목적지가 죽어 있는 동안 다른 목적지 전송이 밀리지 않는다 |
 | 3 | 노드 사이 네트워크 단절 | 각자 받고, 연결 복구 후 양쪽 건수가 같아진다 |
-| 4 | 중계 프로세스만 종료 | HAProxy 가 상대 노드 중계로 보내고 수집이 계속된다 |
+| 4 | 중계 프로세스만 종료 | vmauth 가 상대 노드 중계로 보내고 수집이 계속된다 |
 | 5 | 큐 한도 초과 | 빈 구간이 생기는 것을 확인하고, 보충 절차로 다시 같아진다 |
 | 6 | 같은 쿼리를 A · B 에 각각 | 결과가 같다 (복구 직후 노드는 drain 상태여서 조회를 안 받는다) |
 | 7 | GPU | nvidia-smi · GPM 지표가 공통 이름과 원래 이름으로 쌓인다 (vGPU 게스트) |
-| 8 | SELinux | enforcing 에서 Victoria 부품 · HAProxy · 에이전트가 돌고 `ausearch -m avc` 가 0건. `restorecon -R` 뒤에도 서비스가 뜬다 |
+| 8 | SELinux | enforcing 에서 Victoria 부품 · vmauth · 에이전트가 돌고 `ausearch -m avc` 가 0건. `restorecon -R` 뒤에도 서비스가 뜬다 |
 | 9 | 다른 대역 | 라우팅만 되는 다른 대역 VM 에서 두 노드로 보내고, 장애 전환 뒤에도 계속 된다 |
 | 10 | 알림 | vmalert 한쪽을 멈춰도 알림이 한 번만 온다. 메트릭 · 로그 규칙을 한 vmalert 가 평가한다. 규칙을 HTTP 로 가져간다 |
 | 11 | Prometheus 전환 | 같은 OTLP 를 Prometheus 와 VictoriaMetrics 에 보내 시계열 이름 · 라벨이 같다. 조회와 vmalert 를 주소만 바꿔 Prometheus 로 돌린다 |
@@ -597,16 +683,15 @@
 
 | 항목 | 결과 | 근거 |
 |---|---|---|
-| 중앙 2노드 설치 | 됨. 두 노드 모두 서비스 9개 `active`, 로컬 부품 `/health` 200 | `poc/checks/central-health.sh` 출력 |
+| 중앙 2노드 설치 (`/cmp-mon`, vmauth, HTTPS · 토큰) | 됨. 두 노드 모두 서비스 9개 `active`, 로컬 부품 `/health` 200 | `poc/checks/central-health.sh` |
 | 바깥 포트 | 두 노드 모두 4318 · 7443 · 8443 · 9094 만 노드 IP 에서 듣는다 (SSH 등 기존 것 제외) | `ss -ltn` |
-| 노드 사이 경로 | 상대 노드 `:7443/vm/health` · `/am/-/healthy` 200 | 위 출력 |
-| 복제 | vmagent 가 로컬 저장소와 상대 노드에 같은 바이트를 보냈고, 두 노드의 VictoriaMetrics 에 같은 샘플 수가 있다 | `vmagent_remotewrite_bytes_sent_total`, `count_over_time(ALERTS[10m])` |
-| 알림 경로 | vmalert → `:4318` 기록 → 양쪽 저장소, vmalert → Alertmanager 둘. Alertmanager 클러스터 `ready`, 피어 2개 | `/api/v2/status` |
-| SELinux (시험 8 일부) | Victoria 부품은 `unconfined_service_t`, HAProxy 는 `haproxy_t`. `haproxy_connect_any` 없이는 HAProxy 가 시작하지 못함. 켠 뒤 AVC 0건 | `ps -eZ`, `ausearch -m avc` |
-| 장애 시험 1~6 | 아직 안 함 | |
-| 에이전트 | 아직 안 함 | |
-
----
+| 토큰 | 조회 경로: 조회 토큰 200, 토큰 없이 401. 노드 사이 경로: 노드 토큰 200, 조회 토큰으로는 거부 | 위 출력 |
+| 복제 | vmagent 가 로컬과 상대 노드에 같은 바이트를 보냈고, 두 노드 VictoriaMetrics 의 같은 구간 샘플 수가 같다 (HAProxy 구성 때 확인) | `vmagent_remotewrite_bytes_sent_total`, `count_over_time` |
+| 시험 4: 중계만 종료 | 노드 A 의 vmagent 를 멈추자 A 의 입구가 B 의 `:7443/vmagent` 로 넘겼다 (6건), 다시 켜자 로컬로 돌아왔다 (HAProxy 구성 때 확인. vmauth 로 다시 볼 것) | 입구 통계 |
+| 시험 2: 노드 B 정지 · 복구 | B 의 서비스를 모두 멈춘 3분 동안 A 는 조회 200, A 의 B 몫 큐 916KB. B 를 켜자 4초 만에 큐 0, 1분 뒤 두 노드의 6분 구간 샘플 수 180,357 로 같음 (HAProxy 구성 때 확인) | `checks/failover.sh` |
+| 이중화 → 단일 전환 | 노드 A 를 단일로 다시 설치: 상대 노드 몫 큐 3개 삭제, 바깥 포트 4318 · 8443 만, 서비스 정상 | 설치 출력, 점검 |
+| SELinux | Enforcing 에서 모든 부품(vmauth 포함)이 `unconfined_service_t`, AVC 0건. 라벨은 CIL 모듈로. 배포판 HAProxy 는 `haproxy_connect_any` 없이 시작 못 함 | `ps -eZ`, `ausearch -m avc` |
+| 시험 1 · 3 · 5 · 6, 단일 → 이중화 복구와 과거 메트릭 채우기, 에이전트 | 아직 안 함 | |
 
 ## 12. 도입 순서
 
@@ -615,7 +700,7 @@
 | 단계 | 내용 | 되돌리기 |
 |---|---|---|
 | 0 | PoC (11절) | - |
-| 1 | 중앙 구축: HAProxy · Victoria 3종 · vmalert · Alertmanager ×2 | 중앙을 내리면 끝 |
+| 1 | 중앙 구축: vmauth · Victoria 3종 · vmalert · Alertmanager ×2 | 중앙을 내리면 끝 |
 | 2 | 에이전트 배포: 서버 그룹별로 | 그룹별로 되돌림 |
 | 3 | 관리 서버 연결: 조회 · 알림 규칙 HTTP 제공 · webhook 수신 | 연결만 끊음 |
 | 4 | vSphere 수집기, 기존 Prometheus 합류, 용량 재산정 | 개별로 되돌림 |
@@ -644,7 +729,9 @@
 - 한 vmalert 가 메트릭 · 로그 규칙을 함께 평가하는 구성 (PoC 시험 10).
 - Prometheus OTLP 이름 변환과 VictoriaMetrics `usePrometheusNaming` 이 같은 이름을 내는지 (PoC 시험 11).
 - OCB 로 만든 바이너리의 Windows 서비스 동작, 정적 바이너리가 오래된 배포판에서 도는지 (`ldd` 로 "not a dynamic executable").
-- HAProxy 의 SELinux 설정(`haproxy_connect_any` 또는 포트 등록), `unconfined_service_t` 에서 BPF 로드가 허용되는지.
+- `unconfined_service_t` 에서 BPF 로드가 허용되는지 (OBI).
+- vmauth 가 쓰기 요청(POST)을 상대 노드로 다시 보낼 때 본문을 온전히 다시 보내는지 (`-requestBufferSize`).
+- 복구된 노드를 큐가 빌 때까지 조회에서 빼는 방법 (3.7, 아직 구현 안 함).
 - `furiosa-metrics-exporter` 가 고정한 `furiosa-smi-go` 버전이 이미 순수 Go 인지, furiosa-smi CLI 의 JSON 출력.
 - amd-smi 가 드라이버 쪽 패키지에 들어 있는지.
 - AMD 파티션(CPX)이 MIG 처럼 격리되는지, NPU 도구가 VM 게스트 안에서 도는지.
@@ -745,7 +832,7 @@
 
 ### 14.5 네트워크 환경별로 되나
 
-| 환경 | ② 주소 2개 + 노드별 HAProxy (선택) | ① VIP (참고) |
+| 환경 | ② 주소 2개 + 노드마다 vmauth 입구 (선택) | ① VIP (참고) |
 |---|---|---|
 | OpenStack, 에이전트가 같은 대역 | 된다 | 된다 (allowed-address-pairs, VRRP 보안그룹, unicast) |
 | OpenStack, 에이전트가 다른 대역 | 된다 (라우터 경유) | 된다 (라우터 경유) |
@@ -760,39 +847,42 @@
 
 PoC 에서 실제로 쓰는 설정은 `poc/` 에 있다. 아래는 구조를 보여 주는 초안이다.
 
-### HAProxy (발췌. 전체는 `poc/central/conf/haproxy.cfg.tmpl`)
+### vmauth 입구 (노드 A, 발췌. 만드는 곳은 `poc/central/gen-gateway.sh`)
 
-```conf
-frontend ingest                          # :4318 수집
-    bind <자기>:4318
-    acl is_metrics path_beg /v1/metrics
-    acl vm_up nbsrv(ing_vm_local) gt 0
-    use_backend ing_vm_local if is_metrics vm_up   # 로컬 vmagent 가 살아 있으면
-    use_backend ing_vm_peer  if is_metrics         # 아니면 상대 노드로
-backend ing_vm_local
-    option httpchk GET /health
-    http-request set-path /opentelemetry/v1/metrics
-    server local 127.0.0.1:8429 check
-backend ing_vm_peer
-    option httpchk GET /vmagent/health
-    http-request set-path /vmagent/opentelemetry/v1/metrics
-    server peer <상대>:7443 check
-# /v1/logs, /v1/traces, /api/v1/write 도 같은 모양
+```yaml
+users:
+  - name: query                                   # 조회 토큰
+    bearer_token: "<조회 토큰>"
+    url_map:
+      - src_paths: ["/metrics/.*"]
+        drop_src_path_prefix_parts: 1             # /metrics 를 떼고 넘긴다
+        load_balancing_policy: first_available    # 로컬 먼저, 죽으면 다음
+        retry_status_codes: [502, 503, 504]
+        headers: ["Authorization: Bearer <노드 사이 토큰>"]   # 상대 노드로 넘길 때 쓴다
+        url_prefix: ["http://127.0.0.1:8428", "https://<상대>:7443/vm"]
+      # /metrics/select/logsql/.* (먼저), /logs/.*, /traces/.* 도 같은 모양
+  - name: peer                                    # 노드 사이 토큰
+    bearer_token: "<노드 사이 토큰>"
+    url_map:
+      - src_paths: ["/vm/.*"]
+        drop_src_path_prefix_parts: 1
+        url_prefix: ["http://127.0.0.1:8428"]
+      # /vl, /vt, /vmagent, /vlagent, /vtagent, /am 도 같은 모양
+unauthorized_user:                                # 토큰 없음 = 수집
+  url_map:
+    - src_paths: ["/v1/metrics"]
+      load_balancing_policy: first_available
+      headers: ["Authorization: Bearer <노드 사이 토큰>"]
+      url_prefix: ["http://127.0.0.1:8429/opentelemetry", "https://<상대>:7443/vmagent/opentelemetry"]
+    # /v1/logs, /v1/traces, /api/v1/write 도 같은 모양
+```
 
-frontend query                           # :8443 조회
-    bind <자기>:8443
-    acl to_vl path_beg /logs/ /metrics/select/logsql/
-    acl to_vt path_beg /traces/
-    acl to_vm path_beg /metrics/
-    # 목적지를 정하고 앞부분(/metrics 등)을 뗀 뒤, 로컬 → 상대 순서로 보낸다
-
-frontend peer                            # :7443 노드 사이
-    bind <자기>:7443
-    http-request deny unless { src <상대> <자기> 127.0.0.1 }
-    http-request set-var(txn.part) path,field(2,/)
-    http-request set-path %[path,regsub(^/[a-z]+/,/)]
-    use_backend p_vm if { var(txn.part) -m str vm }   # → 127.0.0.1:8428
-    # vl, vt, vmagent, vlagent, vtagent, am 도 같은 모양
+```sh
+vmauth -auth.config=/cmp-mon/conf/gateway.yml \
+       -httpListenAddr=<자기>:4318,<자기>:8443,<자기>:7443 \
+       -tls=true,true,true -tlsCertFile=<server.pem ×3> -tlsKeyFile=<server.key ×3> \
+       -httpInternalListenAddr=127.0.0.1:8427 \
+       -backend.tlsInsecureSkipVerify            # TLS_VERIFY=ca 면 -backend.TLSCAFile=ca.pem
 ```
 
 ### 중계 에이전트 (노드 A, 노드 B 도 같음)
@@ -800,31 +890,26 @@ frontend peer                            # :7443 노드 사이
 ```sh
 vmagent  -httpListenAddr=127.0.0.1:8429 \
          -remoteWrite.url=http://127.0.0.1:8428/api/v1/write \
-         -remoteWrite.url=http://<상대>:7443/vm/api/v1/write \
-         -remoteWrite.tmpDataPath=/var/lib/mon2/vmagent-queue \
+         -remoteWrite.url=https://<상대>:7443/vm/api/v1/write \
+         -remoteWrite.bearerTokenFile=,/cmp-mon/conf/tokens/peer.token \   # 목적지 순서대로: 로컬은 비움
+         -remoteWrite.tlsInsecureSkipVerify=false,true \
+         -remoteWrite.tmpDataPath=/cmp-mon/data/vmagent-queue \
          -remoteWrite.maxDiskUsagePerURL=<PoC 실측 후> \
          -opentelemetry.usePrometheusNaming
-
-vlagent  -httpListenAddr=127.0.0.1:9429 \
-         -remoteWrite.url=http://127.0.0.1:9428/insert/native \
-         -remoteWrite.url=http://<상대>:7443/vl/insert/native \
-         -remoteWrite.tmpDataPath=/var/lib/mon2/vlagent-queue
-
-vtagent  -httpListenAddr=127.0.0.1:10429 \
-         -remoteWrite.url=http://127.0.0.1:10428/insert/native \
-         -remoteWrite.url=http://<상대>:7443/vt/insert/native \
-         -remoteWrite.tmpDataPath=/var/lib/mon2/vtagent-queue
+# vlagent (/vl/insert/native), vtagent (/vt/insert/native) 도 같은 모양
 ```
 
 ### 알림 (노드 A)
 
 ```sh
 vmalert       -httpListenAddr=127.0.0.1:8880 \
-              -datasource.url=http://<자기>:8443/metrics \
-              -remoteWrite.url=http://<자기>:4318 \
-              -remoteRead.url=http://<자기>:8443/metrics \
-              -notifier.url=http://127.0.0.1:9093 -notifier.url=http://<상대>:7443/am \
-              -rule=http://<관리 서버>/alert-rules/metrics.yaml
+              -datasource.url=https://<자기>:8443/metrics -datasource.bearerTokenFile=<조회 토큰> \
+              -remoteRead.url=https://<자기>:8443/metrics -remoteRead.bearerTokenFile=<조회 토큰> \
+              -remoteWrite.url=https://<자기>:4318 \
+              -notifier.url=http://127.0.0.1:9093 -notifier.url=https://<상대>:7443/am \
+              -notifier.bearerTokenFile=,<노드 사이 토큰> -notifier.tlsInsecureSkipVerify=false,true \
+              -datasource.tlsInsecureSkipVerify -remoteRead.tlsInsecureSkipVerify -remoteWrite.tlsInsecureSkipVerify \
+              -rule=/cmp-mon/conf/rules/*.yml
 alertmanager  --web.listen-address=127.0.0.1:9093 \
               --cluster.listen-address=<자기>:9094 --cluster.peer=<상대>:9094
 # receiver 는 webhook 1개: 관리 서버
@@ -846,7 +931,8 @@ processors:
   batch: {}
 exporters:
   cmpotlp:                # 자체
-    endpoints: ["http://<노드A>:4318", "http://<노드B>:4318"]   # 서버마다 A,B 또는 B,A
+    endpoints: ["https://<노드A>:4318", "https://<노드B>:4318"]   # 서버마다 A,B 또는 B,A
+    tls: { insecure_skip_verify: true }   # 또는 ca_file: 사설 CA
     sending_queue: { storage: file_storage }
 service:
   extensions: [file_storage]
