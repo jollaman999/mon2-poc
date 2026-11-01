@@ -7,7 +7,7 @@ Wants=network-online.target
 User=mon2
 Group=mon2
 EnvironmentFile=/etc/mon2/mon2.env
-ExecStart=/opt/mon2/bin/victoria-metrics-prod -httpListenAddr=${SELF}:8428 -storageDataPath=/var/lib/mon2/victoria-metrics -retentionPeriod=${RETENTION} -dedup.minScrapeInterval=1ms -opentelemetry.usePrometheusNaming
+ExecStart=/opt/mon2/bin/victoria-metrics-prod -httpListenAddr=127.0.0.1:8428 -storageDataPath=/var/lib/mon2/victoria-metrics -retentionPeriod=${RETENTION} -dedup.minScrapeInterval=1ms -opentelemetry.usePrometheusNaming
 Restart=always
 RestartSec=3
 LimitNOFILE=1048576

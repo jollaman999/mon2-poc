@@ -7,7 +7,7 @@ Wants=network-online.target
 User=mon2
 Group=mon2
 EnvironmentFile=/etc/mon2/mon2.env
-ExecStart=/opt/mon2/bin/vmagent-prod -httpListenAddr=${SELF}:8429 -remoteWrite.url=http://${NODE_A}:8428/api/v1/write -remoteWrite.url=http://${NODE_B}:8428/api/v1/write -remoteWrite.tmpDataPath=/var/lib/mon2/vmagent-queue -remoteWrite.maxDiskUsagePerURL=${QUEUE_MAX} -opentelemetry.usePrometheusNaming
+ExecStart=/opt/mon2/bin/vmagent-prod -httpListenAddr=127.0.0.1:8429 -remoteWrite.url=http://127.0.0.1:8428/api/v1/write -remoteWrite.url=http://${PEER}:7443/vm/api/v1/write -remoteWrite.tmpDataPath=/var/lib/mon2/vmagent-queue -remoteWrite.maxDiskUsagePerURL=${QUEUE_MAX} -opentelemetry.usePrometheusNaming
 Restart=always
 RestartSec=3
 LimitNOFILE=1048576

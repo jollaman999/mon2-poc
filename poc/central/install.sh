@@ -73,7 +73,8 @@ systemctl restart haproxy
 
 echo "[7/7] 방화벽"
 if systemctl is-active --quiet firewalld; then
-  for p in 4318 18428 18429 19428 20428 8428 8429 9428 9429 10428 10429 8880 9093 9094; do
+  # 바깥에 여는 것은 HAProxy 3개(수집 4318, 조회 8443, 노드 사이 7443)와 Alertmanager 클러스터 9094 뿐이다
+  for p in 4318 8443 7443 9094; do
     firewall-cmd --permanent --add-port=$p/tcp >/dev/null
   done
   firewall-cmd --permanent --add-port=9094/udp >/dev/null

@@ -17,12 +17,15 @@
 
 ## 중앙 노드에 깔리는 것
 
+바깥에 여는 포트는 HAProxy 의 4318(수집) · 8443(조회) · 7443(노드 사이)과 Alertmanager 클러스터 9094(TCP · UDP) 뿐이다. 나머지는 모두 `127.0.0.1` 에서만 듣는다.
+
 | 부품 | 포트 | 위치 |
 |---|---|---|
-| VictoriaMetrics · VictoriaLogs · VictoriaTraces | 8428 · 9428 · 10428 | `/opt/mon2/bin`, 데이터 `/var/lib/mon2` |
-| vmagent · vlagent · vtagent | 8429 · 9429 · 10429 | 양쪽 저장소에 복제, 큐 `/var/lib/mon2/*-queue` |
-| vmalert · Alertmanager | 8880 · 9093/9094 | 규칙 `/etc/mon2/rules` |
-| HAProxy | 4318, 18429, 18428 · 19428 · 20428 | 배포판 RPM, 설정 `/etc/haproxy/haproxy.cfg` |
+| HAProxy | 4318 · 8443 · 7443 (노드 IP) | 배포판 RPM, 설정 `/etc/haproxy/haproxy.cfg` |
+| VictoriaMetrics · VictoriaLogs · VictoriaTraces | 127.0.0.1:8428 · 9428 · 10428 | `/opt/mon2/bin`, 데이터 `/var/lib/mon2` |
+| vmagent · vlagent · vtagent | 127.0.0.1:8429 · 9429 · 10429 | 로컬 저장소와 상대 `:7443` 에 복제, 큐 `/var/lib/mon2/*-queue` |
+| vmalert | 127.0.0.1:8880 | 규칙 `/etc/mon2/rules` |
+| Alertmanager | 127.0.0.1:9093, 노드 IP:9094 | 클러스터 |
 
 모든 서비스는 `mon2` 계정으로 돈다(HAProxy 는 배포판 기본).
 

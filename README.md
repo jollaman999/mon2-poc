@@ -133,7 +133,7 @@
 
 **알고 써야 할 점**
 - **노드 간 단절 시**(6절 ③) 두 노드가 각자 받으므로 잠시 내용이 다르다. 복구되면 큐가 비며 같아진다. 조회는 단절 동안 한 노드에 고정한다.
-- **방화벽**: 에이전트가 있는 대역에서 두 노드의 수집 포트(4318)가 열려 있어야 한다.
+- **방화벽**: 에이전트가 있는 대역에서 두 노드의 수집 포트(4318) 하나만 열려 있으면 된다 (5절).
 - **OpenStack 밖에서 들어올 때**: 노드마다 Floating IP 를 따로 붙이면 된다. VIP 포트에 Floating IP 를 붙이는 방식에서 나던 DVR · OVN 문제는 생기지 않는다.
 
 ### 3.4 중계 - OTel Collector 가 아니라 Victoria 에이전트
@@ -220,7 +220,7 @@
 
 | 후보 | 판단 |
 |---|---|
-| **관리 서버가 두 노드 주소를 알고 나눠 조회 + 노드별 HAProxy (선택)** | 수집과 같은 원칙이다. 조회하는 쪽이 관리 서버 · vmalert 정도라 주소 2개를 아는 것이 어렵지 않다 |
+| **관리 서버가 두 노드 주소를 알고 나눠 조회 + 노드별 HAProxy (선택)** | 수집과 같은 원칙이다. 조회 입구는 노드마다 `:8443` 하나다. 조회하는 쪽이 관리 서버 · vmalert 정도라 주소 2개를 아는 것이 어렵지 않다 |
 | vmauth (Victoria 의 조회 라우터) | 기능은 충분하지만 HAProxy 와 같은 일을 하는 부품이 하나 더 생긴다 |
 
 **지켜야 할 규칙**: **복구된 노드는 큐를 다 받을 때까지 조회에서 뺀다.** Victoria 문서도 "버퍼가 다 전송된 뒤에 조회를 받게 한다" 고 적는다. 각 노드 HAProxy 의 `agent-check` 가 상대 노드 중계의 미전송 바이트 지표를 보고, 0 이 될 때까지 로컬 저장소를 `drain` 으로 둔다. 그동안 그 노드로 온 조회는 상대 노드 저장소가 답한다.
@@ -303,23 +303,33 @@
 
 ![노드마다 같은 포트 지도](figures/05-port-map.png)
 
-두 노드의 설정이 같다. 다른 것은 자기 주소와 상대 주소뿐이다.
+**바깥에 여는 포트는 넷이다.** 부품마다 포트를 열지 않고 HAProxy 한 곳으로 모아 경로로 나눈다. 부품은 모두 `127.0.0.1` 에서만 듣는다. 두 노드의 설정이 같고, 다른 것은 자기 주소와 상대 주소뿐이다.
+
+| 바깥 포트 | 누가 쓰나 | 경로 → 부품 | 방화벽에서 열 출발지 |
+|---|---|---|---|
+| **4318** 수집 | 에이전트 · 앱 · 기존 Prometheus | `/v1/metrics` → vmagent, `/v1/logs` → vlagent, `/v1/traces` → vtagent, `/api/v1/write` → vmagent | 에이전트가 있는 대역 |
+| **8443** 조회 | 관리 서버 · vmalert | `/metrics/...` → VictoriaMetrics, `/logs/...` → VictoriaLogs, `/traces/...` → VictoriaTraces (앞부분을 떼고 넘긴다) | 관리 서버 |
+| **7443** 노드 사이 | 상대 노드만 | `/vm` · `/vl` · `/vt` → 저장소, `/vmagent` · `/vlagent` · `/vtagent` → 중계, `/am` → Alertmanager | 상대 노드 (HAProxy 에서도 출발지를 막는다) |
+| **9094** (TCP · UDP) | 상대 Alertmanager | Alertmanager 클러스터 상태 맞추기. UDP 라 HAProxy 로 묶지 않는다 | 상대 노드 |
+
+**노드 안에서만 쓰는 포트** (`127.0.0.1`)
 
 | 부품 | 포트 | 하는 일 |
 |---|---|---|
-| HAProxy | 4318 (OTLP), 18429 (remote_write), 18428 · 19428 · 20428 (조회) | 로컬 부품을 먼저, 죽었으면 상대 노드 부품으로. 경로를 바꿔 전달 |
-| vmagent | 8429 | 메트릭 중계. 양쪽 VictoriaMetrics 로 복제 |
-| vlagent | 9429 | 로그 중계. 양쪽 VictoriaLogs 로 복제 |
-| vtagent | 10429 | 트레이스 중계. 양쪽 VictoriaTraces 로 복제 |
-| VictoriaMetrics | 8428 | 메트릭 저장 · PromQL |
-| VictoriaLogs | 9428 | 로그 저장 · LogsQL |
-| VictoriaTraces | 10428 | 트레이스 저장 · Jaeger API |
-| vmalert | 8880 | 규칙 평가. 데이터소스는 로컬 HAProxy 조회 포트 |
-| Alertmanager | 9093 (API), 9094 (클러스터) | 알림 중복 제거 → 관리 서버 webhook |
+| VictoriaMetrics · VictoriaLogs · VictoriaTraces | 8428 · 9428 · 10428 | 저장 · 조회 |
+| vmagent · vlagent · vtagent | 8429 · 9429 · 10429 | 중계. 로컬 저장소와 상대 노드 `:7443/vm` 등에 복제 |
+| vmalert | 8880 | 규칙 평가. 데이터소스는 `:8443/metrics`, 기록은 `:4318/api/v1/write` |
+| Alertmanager | 9093 | 상대 vmalert 는 `:7443/am` 으로 들어온다 |
 
-**HAProxy 포트를 따로 두는 이유**: 중계 · 저장소가 노드 IP 의 기본 포트(8429 · 8428 등)를 쓰고, 상대 노드 중계도 그 기본 포트로 저장소에 기록한다. 기본 포트에 10000 을 더한 포트를 HAProxy 에 줬다.
+**로컬 먼저, 죽으면 상대 노드로**: HAProxy 는 서버마다 경로를 바꿀 수 없어서, 로컬 백엔드와 상대 노드(`:7443`) 백엔드를 나누고 로컬에 살아 있는 서버가 없을 때(`nbsrv` 가 0)만 상대 쪽을 쓴다.
 
-**OTLP 를 한 포트(:4318)로 받는 이유**: 에이전트는 노드마다 `:4318` 하나만 알면 된다. HAProxy 가 경로를 보고 각 중계로 보내면서 경로를 바꿔 준다 (`/v1/logs` → `/insert/opentelemetry/v1/logs`).
+**좋은 점**
+- 에이전트 쪽 방화벽은 4318 하나, 관리 서버 쪽은 8443 하나만 열면 된다.
+- 부품이 바깥에 직접 노출되지 않는다. TLS 와 출발지 제한을 HAProxy 한 곳에서 건다.
+
+**알고 써야 할 점**
+- 노드 사이 복제도 HAProxy 를 거친다. 한 노드의 HAProxy 가 죽으면 상대 노드는 그 노드에 기록하지 못하고 큐에 쌓는다. 그 노드가 반쯤 죽은 것과 같은 상황이라 6절의 장애 처리 안에 들어간다.
+- 노드 사이까지 암호화가 꼭 필요한 현장은 두 노드 사이를 WireGuard 같은 터널로 묶는 것을 더할 수 있다. 에이전트는 수가 많아 터널을 맺게 하지 않는다.
 
 설정 초안은 부록 A 에 있고, PoC 에서 실제로 쓰는 것은 `poc/` 에 있다.
 
@@ -411,7 +421,7 @@
 - 라벨은 `chcon` 으로 붙이지 않는다. `chcon` 은 전체 재라벨링(`restorecon -R`, `/.autorelabel`) 때 정책 기본값으로 돌아간다. **`semanage fcontext -a -t bin_t '<설치경로>/bin(/.*)?'` 로 규칙을 등록하고 `restorecon` 한다.** `semanage`(policycoreutils-python-utils) 가 없는 OS 만 `chcon` 으로 둔다.
 - 컨테이너를 안 쓰므로 `container_t` · `/dev/nvidia*` 장치 라벨(`xserver_misc_device_t`) · `:z` 마운트 문제가 생기지 않는다.
 - OBI 는 별도 프로세스로 root 또는 CAP_BPF · PERFMON 등을 준다. 에이전트 본체는 높은 권한이 필요 없다. SELinux 가 BPF 로드를 막는지는 공식 문서에 언급이 없어 PoC 에서 본다.
-- **중앙 노드의 HAProxy**: 배포판 패키지의 HAProxy 는 SELinux 의 `haproxy_t` 도메인에 갇힌다. 기본 정책은 HTTP 계열 포트만 허용하므로, 4318 · 18428 같은 포트를 열고 상대 노드의 8429 등에 붙으려면 `haproxy_connect_any` 불리언을 켜거나 포트를 `semanage port` 로 등록해야 한다. 어느 쪽이 필요한지는 PoC 에서 AVC 로 확인한다.
+- **중앙 노드의 HAProxy**: 배포판 패키지의 HAProxy 는 SELinux 의 `haproxy_t` 도메인에 갇힌다. 기본 정책은 HTTP 계열 포트만 허용하므로, 4318 · 8443 · 7443 같은 포트를 열고 127.0.0.1 의 8429 등에 붙으려면 `haproxy_connect_any` 불리언을 켜거나 포트를 `semanage port` 로 등록해야 한다. 어느 쪽이 필요한지는 PoC 에서 AVC 로 확인한다.
 
 ### 8.4 vSphere 수집
 
@@ -429,7 +439,7 @@
 
 | 무엇 | 어떻게 |
 |---|---|
-| 이미 있는 Prometheus | `remote_write` 를 노드 A · B 의 `:18429/api/v1/write` 중 하나로 추가한다. Prometheus 의 remote_write 는 목적지마다 복사하므로 하나만 넣고, 그 노드가 죽으면 Prometheus 자체 WAL 이 재시도한다 |
+| 이미 있는 Prometheus | `remote_write` 를 노드 A · B 의 `:4318/api/v1/write` 중 하나로 추가한다. Prometheus 의 remote_write 는 목적지마다 복사하므로 하나만 넣고, 그 노드가 죽으면 Prometheus 자체 WAL 이 재시도한다 |
 | 이미 있는 scrape 설정 | vmagent 가 `prometheus.yml` 의 `scrape_configs` 를 그대로 읽는다 (`-promscrape.config`) |
 | exporter | 에이전트 `prometheus` 수신기나 vmagent 가 긁는다 |
 | 조회 | PromQL 이 그대로 돈다. MetricsQL 은 PromQL 의 상위 호환이다 |
@@ -477,9 +487,9 @@
 
 | 영역 | 할 일 |
 |---|---|
-| 메트릭 조회 | Prometheus HTTP API + PromQL. 노드 A · B `:18428` 중 살아 있는 쪽. 백엔드 종류 설정 (9.2) |
-| 로그 조회 | LogsQL, 노드 `:19428` |
-| 트레이스 조회 | Jaeger API, 노드 `:20428` |
+| 메트릭 조회 | Prometheus HTTP API + PromQL. 노드 A · B 의 `:8443/metrics` 중 살아 있는 쪽. 백엔드 종류 설정 (9.2) |
+| 로그 조회 | LogsQL, 노드 `:8443/logs` |
+| 트레이스 조회 | Jaeger API, 노드 `:8443/traces` |
 | 알림 | 규칙을 Prometheus 형식(MetricsQL 확장 없이) · LogsQL 로 만들어 HTTP 로 내주기, Alertmanager webhook 수신, 알림 상태 조회 |
 | 에이전트 설정 | 서버마다 노드 주소 순서(A,B · B,A)를 정해 내려 부하를 나눈다. 처음에는 배포 도구로, 나중에는 OpAMP 로 |
 | 이중화 | 관리 서버 자체의 이중화(스케줄러 분산 락, DB 이중화)와 vSphere 수집기 배치는 이 문서 범위 밖이다. 따로 설계한다 |
@@ -666,77 +676,73 @@
 
 PoC 에서 실제로 쓰는 설정은 `poc/` 에 있다. 아래는 구조를 보여 주는 초안이다.
 
-### HAProxy (노드 A. 노드 B 는 `self` · `peer` 만 바꾼다)
+### HAProxy (발췌. 전체는 `poc/central/conf/haproxy.cfg.tmpl`)
 
 ```conf
-frontend in_otlp                        # 에이전트 · OBI · 앱
-    bind <노드A>:4318
-    mode http
-    use_backend vm_otlp if { path_beg /v1/metrics }
-    use_backend vl_otlp if { path_beg /v1/logs }
-    use_backend vt_otlp if { path_beg /v1/traces }
-backend vm_otlp
-    mode http
+frontend ingest                          # :4318 수집
+    bind <자기>:4318
+    acl is_metrics path_beg /v1/metrics
+    acl vm_up nbsrv(ing_vm_local) gt 0
+    use_backend ing_vm_local if is_metrics vm_up   # 로컬 vmagent 가 살아 있으면
+    use_backend ing_vm_peer  if is_metrics         # 아니면 상대 노드로
+backend ing_vm_local
+    option httpchk GET /health
     http-request set-path /opentelemetry/v1/metrics
-    option httpchk GET /health
-    server self <노드A>:8429 check
-    server peer <노드B>:8429 check backup
-# vl_otlp(→ :9429 /insert/opentelemetry/v1/logs), vt_otlp(→ :10429 /insert/opentelemetry/v1/traces) 도 같은 모양
+    server local 127.0.0.1:8429 check
+backend ing_vm_peer
+    option httpchk GET /vmagent/health
+    http-request set-path /vmagent/opentelemetry/v1/metrics
+    server peer <상대>:7443 check
+# /v1/logs, /v1/traces, /api/v1/write 도 같은 모양
 
-frontend in_rw                          # 기존 Prometheus remote_write
-    bind <노드A>:18429
-    mode http
-    default_backend vmagent_raw         # self · peer backup, 경로 그대로
+frontend query                           # :8443 조회
+    bind <자기>:8443
+    acl to_vl path_beg /logs/ /metrics/select/logsql/
+    acl to_vt path_beg /traces/
+    acl to_vm path_beg /metrics/
+    # 목적지를 정하고 앞부분(/metrics 등)을 뗀 뒤, 로컬 → 상대 순서로 보낸다
 
-frontend q_metrics
-    bind <노드A>:18428
-    mode http
-    use_backend vl_query if { path_beg /select/logsql/ }   # vmalert 가 한 주소로 두 저장소를 보게
-    default_backend vm_query
-backend vm_query
-    mode http
-    option httpchk GET /health
-    server self <노드A>:8428 check agent-check agent-port 9999   # 상대 중계 큐가 남았으면 drain
-    server peer <노드B>:8428 check backup
-# :19428(LogsQL → :9428), :20428(Jaeger → :10428) 도 같은 모양
+frontend peer                            # :7443 노드 사이
+    bind <자기>:7443
+    http-request deny unless { src <상대> <자기> 127.0.0.1 }
+    http-request set-var(txn.part) path,field(2,/)
+    http-request set-path %[path,regsub(^/[a-z]+/,/)]
+    use_backend p_vm if { var(txn.part) -m str vm }   # → 127.0.0.1:8428
+    # vl, vt, vmagent, vlagent, vtagent, am 도 같은 모양
 ```
 
 ### 중계 에이전트 (노드 A, 노드 B 도 같음)
 
 ```sh
-vmagent  -httpListenAddr=<노드>:8429 \
-         -remoteWrite.url=http://<노드A>:8428/api/v1/write \
-         -remoteWrite.url=http://<노드B>:8428/api/v1/write \
-         -remoteWrite.tmpDataPath=/var/lib/victoria/vmagent-queue \
+vmagent  -httpListenAddr=127.0.0.1:8429 \
+         -remoteWrite.url=http://127.0.0.1:8428/api/v1/write \
+         -remoteWrite.url=http://<상대>:7443/vm/api/v1/write \
+         -remoteWrite.tmpDataPath=/var/lib/mon2/vmagent-queue \
          -remoteWrite.maxDiskUsagePerURL=<PoC 실측 후> \
-         -opentelemetry.usePrometheusNaming \
-         -opentelemetry.promoteResourceAttributes=<승격할 속성 목록>
+         -opentelemetry.usePrometheusNaming
 
-vlagent  -httpListenAddr=<노드>:9429 \
-         -remoteWrite.url=http://<노드A>:9428/insert/native \
-         -remoteWrite.url=http://<노드B>:9428/insert/native \
-         -remoteWrite.tmpDataPath=/var/lib/victoria/vlagent-queue \
-         -remoteWrite.maxDiskUsagePerURL=<PoC 실측 후>
+vlagent  -httpListenAddr=127.0.0.1:9429 \
+         -remoteWrite.url=http://127.0.0.1:9428/insert/native \
+         -remoteWrite.url=http://<상대>:7443/vl/insert/native \
+         -remoteWrite.tmpDataPath=/var/lib/mon2/vlagent-queue
 
-vtagent  -httpListenAddr=<노드>:10429 \
-         -remoteWrite.url=http://<노드A>:10428/insert/native \
-         -remoteWrite.url=http://<노드B>:10428/insert/native \
-         -remoteWrite.tmpDataPath=/var/lib/victoria/vtagent-queue \
-         -remoteWrite.maxDiskUsagePerURL=<PoC 실측 후>
+vtagent  -httpListenAddr=127.0.0.1:10429 \
+         -remoteWrite.url=http://127.0.0.1:10428/insert/native \
+         -remoteWrite.url=http://<상대>:7443/vt/insert/native \
+         -remoteWrite.tmpDataPath=/var/lib/mon2/vtagent-queue
 ```
 
 ### 알림 (노드 A)
 
 ```sh
-vmalert       -httpListenAddr=<노드>:8880 \
-              -datasource.url=http://<노드A>:18428 \
-              -remoteWrite.url=http://<노드A>:18429 \
-              -remoteRead.url=http://<노드A>:18428 \
-              -notifier.url=http://<노드A>:9093 -notifier.url=http://<노드B>:9093 \
-              -rule=http://<관리 서버>/alert-rules/metrics.yaml \
-              -rule=http://<관리 서버>/alert-rules/logs.yaml
-alertmanager  --web.listen-address=<노드>:9093 \
-              --cluster.listen-address=<노드>:9094 --cluster.peer=<노드B>:9094
+vmalert       -httpListenAddr=127.0.0.1:8880 \
+              -datasource.url=http://<자기>:8443/metrics \
+              -remoteWrite.url=http://<자기>:4318 \
+              -remoteRead.url=http://<자기>:8443/metrics \
+              -notifier.url=http://127.0.0.1:9093 -notifier.url=http://<상대>:7443/am \
+              -rule=http://<관리 서버>/alert-rules/metrics.yaml
+alertmanager  --web.listen-address=127.0.0.1:9093 \
+              --cluster.listen-address=<자기>:9094 --cluster.peer=<상대>:9094
 # receiver 는 webhook 1개: 관리 서버
 ```
 

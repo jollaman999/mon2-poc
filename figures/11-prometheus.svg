@@ -6,7 +6,7 @@
 <text x="250" y="150" font-size="18" fill="#334155" font-weight="700" text-anchor="middle">들어오는 쪽</text>
 <rect x="60" y="170" width="380" height="110" rx="14" fill="#fffbeb" stroke="#d97706" stroke-width="2"/>
 <text x="250.0" y="221.5" font-size="19" fill="#92400e" font-weight="700" text-anchor="middle">기존 Prometheus (k8s 등)</text>
-<text x="250.0" y="243.8" font-size="14" fill="#b45309" font-weight="400" text-anchor="middle">remote_write → 노드 :18429</text>
+<text x="250.0" y="243.8" font-size="14" fill="#b45309" font-weight="400" text-anchor="middle">remote_write → 노드 :4318</text>
 <path d="M440,225 C520,225 520,470 598,470" stroke="#2563eb" stroke-width="2.5" fill="none" marker-end="url(#m-blue)"/>
 <rect x="60" y="320" width="380" height="110" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
 <text x="250.0" y="371.5" font-size="19" fill="#0f172a" font-weight="700" text-anchor="middle">prometheus.yml 그대로</text>

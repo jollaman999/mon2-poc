@@ -7,7 +7,7 @@ Wants=network-online.target
 User=mon2
 Group=mon2
 EnvironmentFile=/etc/mon2/mon2.env
-ExecStart=/opt/mon2/bin/victoria-logs-prod -httpListenAddr=${SELF}:9428 -storageDataPath=/var/lib/mon2/victoria-logs -retentionPeriod=${RETENTION}
+ExecStart=/opt/mon2/bin/victoria-logs-prod -httpListenAddr=127.0.0.1:9428 -storageDataPath=/var/lib/mon2/victoria-logs -retentionPeriod=${RETENTION}
 Restart=always
 RestartSec=3
 LimitNOFILE=1048576

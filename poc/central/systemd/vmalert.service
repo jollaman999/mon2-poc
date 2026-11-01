@@ -7,7 +7,7 @@ Wants=network-online.target
 User=mon2
 Group=mon2
 EnvironmentFile=/etc/mon2/mon2.env
-ExecStart=/opt/mon2/bin/vmalert-prod -httpListenAddr=${SELF}:8880 -datasource.url=http://${SELF}:18428 -remoteWrite.url=http://${SELF}:18429 -remoteRead.url=http://${SELF}:18428 -notifier.url=http://${NODE_A}:9093 -notifier.url=http://${NODE_B}:9093 -rule=/etc/mon2/rules/*.yml
+ExecStart=/opt/mon2/bin/vmalert-prod -httpListenAddr=127.0.0.1:8880 -datasource.url=http://${SELF}:8443/metrics -remoteWrite.url=http://${SELF}:4318 -remoteRead.url=http://${SELF}:8443/metrics -notifier.url=http://127.0.0.1:9093 -notifier.url=http://${PEER}:7443/am -rule=/etc/mon2/rules/*.yml
 Restart=always
 RestartSec=3
 LimitNOFILE=1048576
