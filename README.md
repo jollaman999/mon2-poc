@@ -6,6 +6,10 @@
 
 ![목표 구조](figures/04-target.png)
 
+**노드 안 · 노드 사이 상세 흐름** (포트 · 경로 · 복제 방향, 5.1절에서 설명)
+
+![노드 사이 상세 구조](figures/20-node-detail.png)
+
 | 질문 | 답 |
 |---|---|
 | 무엇을 만드나 | 노드 2대가 똑같은 일을 하는 모니터링 백엔드. 메트릭은 VictoriaMetrics, 로그는 VictoriaLogs, 트레이스는 VictoriaTraces |
