@@ -1,0 +1,11 @@
+# PoC 용 규칙. 알림 경로(vmalert → Alertmanager → webhook)와 중복 제거를 보려고 늘 울리는 규칙 하나를 둔다.
+groups:
+  - name: poc
+    interval: 30s
+    rules:
+      - alert: PocHeartbeat
+        expr: vector(1)
+        labels:
+          severity: info
+        annotations:
+          summary: "PoC 알림 경로 확인용"

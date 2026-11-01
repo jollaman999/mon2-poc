@@ -1,0 +1,16 @@
+[Unit]
+Description=vmalert (알림 규칙 평가)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=mon2
+Group=mon2
+EnvironmentFile=/etc/mon2/mon2.env
+ExecStart=/opt/mon2/bin/vmalert-prod -httpListenAddr=${SELF}:8880 -datasource.url=http://${SELF}:18428 -remoteWrite.url=http://${SELF}:18429 -remoteRead.url=http://${SELF}:18428 -notifier.url=http://${NODE_A}:9093 -notifier.url=http://${NODE_B}:9093 -rule=/etc/mon2/rules/*.yml
+Restart=always
+RestartSec=3
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target

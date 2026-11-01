@@ -1,0 +1,16 @@
+[Unit]
+Description=vmagent (메트릭 중계, 양쪽 저장소에 복제)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=mon2
+Group=mon2
+EnvironmentFile=/etc/mon2/mon2.env
+ExecStart=/opt/mon2/bin/vmagent-prod -httpListenAddr=${SELF}:8429 -remoteWrite.url=http://${NODE_A}:8428/api/v1/write -remoteWrite.url=http://${NODE_B}:8428/api/v1/write -remoteWrite.tmpDataPath=/var/lib/mon2/vmagent-queue -remoteWrite.maxDiskUsagePerURL=${QUEUE_MAX} -opentelemetry.usePrometheusNaming
+Restart=always
+RestartSec=3
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target

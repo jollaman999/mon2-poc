@@ -1,0 +1,16 @@
+[Unit]
+Description=vtagent (트레이스 중계, 양쪽 저장소에 복제)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=mon2
+Group=mon2
+EnvironmentFile=/etc/mon2/mon2.env
+ExecStart=/opt/mon2/bin/vtagent-prod -httpListenAddr=${SELF}:10429 -remoteWrite.url=http://${NODE_A}:10428/insert/native -remoteWrite.url=http://${NODE_B}:10428/insert/native -remoteWrite.tmpDataPath=/var/lib/mon2/vtagent-queue -remoteWrite.maxDiskUsagePerURL=${QUEUE_MAX}
+Restart=always
+RestartSec=3
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target

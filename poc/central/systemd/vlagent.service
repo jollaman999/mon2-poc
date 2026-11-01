@@ -1,0 +1,16 @@
+[Unit]
+Description=vlagent (로그 중계, 양쪽 저장소에 복제)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=mon2
+Group=mon2
+EnvironmentFile=/etc/mon2/mon2.env
+ExecStart=/opt/mon2/bin/vlagent-prod -httpListenAddr=${SELF}:9429 -remoteWrite.url=http://${NODE_A}:9428/insert/native -remoteWrite.url=http://${NODE_B}:9428/insert/native -remoteWrite.tmpDataPath=/var/lib/mon2/vlagent-queue -remoteWrite.maxDiskUsagePerURL=${QUEUE_MAX}
+Restart=always
+RestartSec=3
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target

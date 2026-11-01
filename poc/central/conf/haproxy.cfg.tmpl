@@ -1,0 +1,77 @@
+# @SELF@ = 이 노드, @PEER@ = 상대 노드. install.sh 가 바꿔 넣는다.
+# 원칙: 로컬 부품을 먼저 쓰고, 로컬이 죽었으면 상대 노드 부품으로 보낸다 (backup).
+global
+    log /dev/log local0
+    maxconn 20000
+
+defaults
+    mode http
+    log global
+    option httplog
+    timeout connect 3s
+    timeout client 60s
+    timeout server 60s
+    option httpchk GET /health
+    default-server inter 2s fall 2 rise 2
+
+frontend stats
+    bind 127.0.0.1:8404
+    stats enable
+    stats uri /stats
+    monitor-uri /healthz
+
+# ---------- 수집 ----------
+frontend in_otlp
+    bind @SELF@:4318
+    use_backend vm_otlp if { path_beg /v1/metrics }
+    use_backend vl_otlp if { path_beg /v1/logs }
+    use_backend vt_otlp if { path_beg /v1/traces }
+
+backend vm_otlp
+    http-request set-path /opentelemetry/v1/metrics
+    server self @SELF@:8429 check
+    server peer @PEER@:8429 check backup
+
+backend vl_otlp
+    http-request set-path /insert/opentelemetry/v1/logs
+    server self @SELF@:9429 check
+    server peer @PEER@:9429 check backup
+
+backend vt_otlp
+    http-request set-path /insert/opentelemetry/v1/traces
+    server self @SELF@:10429 check
+    server peer @PEER@:10429 check backup
+
+frontend in_rw
+    bind @SELF@:18429
+    default_backend vmagent_raw
+
+backend vmagent_raw
+    server self @SELF@:8429 check
+    server peer @PEER@:8429 check backup
+
+# ---------- 조회 ----------
+frontend q_metrics
+    bind @SELF@:18428
+    use_backend vl_query if { path_beg /select/logsql/ }
+    default_backend vm_query
+
+frontend q_logs
+    bind @SELF@:19428
+    default_backend vl_query
+
+frontend q_traces
+    bind @SELF@:20428
+    default_backend vt_query
+
+backend vm_query
+    server self @SELF@:8428 check
+    server peer @PEER@:8428 check backup
+
+backend vl_query
+    server self @SELF@:9428 check
+    server peer @PEER@:9428 check backup
+
+backend vt_query
+    server self @SELF@:10428 check
+    server peer @PEER@:10428 check backup
