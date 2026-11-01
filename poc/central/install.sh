@@ -43,6 +43,7 @@ echo "[4/7] 설정"
 install -m 0644 node.env /etc/mon2/mon2.env
 sed "s|@WEBHOOK@|$WEBHOOK|" conf/alertmanager.yml > /etc/mon2/alertmanager.yml
 install -m 0644 conf/rules/*.yml /etc/mon2/rules/
+sed "s|@SELF@|$SELF|" conf/scrape.yml > /etc/mon2/scrape.yml
 
 echo "[5/7] HAProxy"
 if ! rpm -q haproxy >/dev/null 2>&1; then
