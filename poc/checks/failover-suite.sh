@@ -33,7 +33,7 @@ for t in $tests; do
     sleep 100
     during=$(metric "$NODE_B" 8429 'vmagent_rows_inserted_total\{type="promremotewrite"\}')
     log "B 의 vmagent 가 remote_write 로 받은 행: 정지 전 $before → 100초 뒤 $during (A 의 vmalert 기록이 B 로 넘어왔으면 늘어난다)"
-    on "$NODE_A" "grep -iE 'warn|error' $BASE/logs/gateway.log | tail -3" || true
+    on "$NODE_A" "sudo grep -iE 'warn|error' $BASE/logs/gateway.log | tail -3" || true
     $F start A vmagent
     sleep 20
     $F count 5m
@@ -55,7 +55,7 @@ for t in $tests; do
     sleep 100
     log "차단 중 A 큐 $(queue_sum "$NODE_A") / B 큐 $(queue_sum "$NODE_B") 바이트"
     sleep 100
-    on "$NODE_A" "sudo nft list tables" || true
+    on "$NODE_A" "ip route show | grep blackhole || echo '차단 풀림'" || true
     wait_queue_zero "$NODE_A" 300 || true
     wait_queue_zero "$NODE_B" 300 || true
     sleep 60

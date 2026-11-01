@@ -687,11 +687,12 @@
 | 바깥 포트 | 두 노드 모두 4318 · 7443 · 8443 · 9094 만 노드 IP 에서 듣는다 (SSH 등 기존 것 제외) | `ss -ltn` |
 | 토큰 | 조회 경로: 조회 토큰 200, 토큰 없이 401. 노드 사이 경로: 노드 토큰 200, 조회 토큰으로는 거부 | 위 출력 |
 | 복제 | vmagent 가 로컬과 상대 노드에 같은 바이트를 보냈고, 두 노드 VictoriaMetrics 의 같은 구간 샘플 수가 같다 (HAProxy 구성 때 확인) | `vmagent_remotewrite_bytes_sent_total`, `count_over_time` |
-| 시험 4: 중계만 종료 | 노드 A 의 vmagent 를 멈추자 A 의 입구가 B 의 `:7443/vmagent` 로 넘겼다 (6건), 다시 켜자 로컬로 돌아왔다 (HAProxy 구성 때 확인. vmauth 로 다시 볼 것) | 입구 통계 |
-| 시험 2: 노드 B 정지 · 복구 | B 의 서비스를 모두 멈춘 3분 동안 A 는 조회 200, A 의 B 몫 큐 916KB. B 를 켜자 4초 만에 큐 0, 1분 뒤 두 노드의 6분 구간 샘플 수 180,357 로 같음 (HAProxy 구성 때 확인) | `checks/failover.sh` |
+| 시험 4: 중계만 종료 | vmauth 구성에서 노드 A 의 vmagent 를 멈춘 100초 동안 B 의 vmagent 가 remote_write 로 받은 행이 30 → 42 로 늘었다 (A 의 기록이 A 의 입구를 거쳐 B 로 넘어감). 다시 켠 뒤 두 노드의 5분 구간 샘플 수 173,398 로 같음 | `checks/failover-suite.sh 4` |
+| 시험 2: 노드 B 정지 · 복구 | B 의 서비스를 모두 멈춘 3분 동안 A 는 조회 200, A 의 B 몫 큐 902,392 바이트. B 를 켜자 5초 안에 큐 0, 두 노드의 8분 구간 샘플 수 216,319 · ALERTS 16 으로 같음 | `checks/failover-suite.sh 2` |
+| 시험 3: 노드 사이 통신 차단 | 노드 A 에서 B 로 가는 경로를 3분 막자(`ip route blackhole`) 각자 받으면서 A 큐 449,443 · B 큐 469,701 바이트가 쌓였다. 풀린 뒤 두 노드 모두 5초 안에 큐 0, 8분 구간 샘플 수 272,221 · ALERTS 16 으로 같음 | `checks/failover-suite.sh 3` |
 | 이중화 → 단일 전환 | 노드 A 를 단일로 다시 설치: 상대 노드 몫 큐 3개 삭제, 바깥 포트 4318 · 8443 만, 서비스 정상 | 설치 출력, 점검 |
 | SELinux | Enforcing 에서 모든 부품(vmauth 포함)이 `unconfined_service_t`, AVC 0건. 라벨은 CIL 모듈로. 배포판 HAProxy 는 `haproxy_connect_any` 없이 시작 못 함 | `ps -eZ`, `ausearch -m avc` |
-| 시험 1 · 3 · 5 · 6, 단일 → 이중화 복구와 과거 메트릭 채우기, 에이전트 | 아직 안 함 | |
+| 시험 1 · 5 · 6, 단일 → 이중화 복구와 과거 메트릭 채우기, 에이전트 | 아직 안 함 | |
 
 ## 12. 도입 순서
 

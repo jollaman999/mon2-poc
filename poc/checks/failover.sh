@@ -49,18 +49,15 @@ case "$cmd" in
     ;;
   cut)
     n=$1; mins=${2:-5}; peer=$(peer_of "$n")
-    # 자기 nftables 표 하나만 만들고, systemd-run 으로 지정한 분 뒤에 그 표를 지운다 (잊어도 풀린다)
-    on "$n" "sudo nft add table inet poccut && \
-             sudo nft add chain inet poccut block '{ type filter hook input priority -10; }' && \
-             sudo nft add chain inet poccut blockout '{ type filter hook output priority -10; }' && \
-             sudo nft add rule inet poccut block ip saddr $peer drop && \
-             sudo nft add rule inet poccut blockout ip daddr $peer drop && \
-             sudo systemd-run --on-active=${mins}m --unit=poc-cut-heal nft delete table inet poccut && \
+    # 패키지가 필요 없는 ip route 로 막는다: 상대 노드로 가는 경로를 blackhole 로 바꾼다 (오가는 응답이 모두 끊긴다).
+    # systemd-run 으로 지정한 분 뒤에 저절로 지운다 (잊어도 풀린다)
+    on "$n" "sudo ip route add blackhole $peer/32 && \
+             sudo systemd-run --on-active=${mins}m --unit=poc-cut-heal ip route del blackhole $peer/32 && \
              echo '차단 시작: $peer, ${mins}분 뒤 자동 해제'"
     ;;
   heal)
-    n=$1
-    on "$n" "sudo nft delete table inet poccut 2>/dev/null; sudo systemctl stop poc-cut-heal.timer 2>/dev/null; sudo nft list tables"
+    n=$1; peer=$(peer_of "$n")
+    on "$n" "sudo ip route del blackhole $peer/32 2>/dev/null; sudo systemctl stop poc-cut-heal.timer 2>/dev/null; ip route show | grep blackhole || echo '차단 없음'"
     ;;
   *)
     sed -n '2,10p' "$0"; exit 1 ;;
