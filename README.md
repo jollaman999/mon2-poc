@@ -333,6 +333,21 @@
 
 설정 초안은 부록 A 에 있고, PoC 에서 실제로 쓰는 것은 `poc/` 에 있다.
 
+### 5.1 노드 사이 상세 구조
+
+![노드 사이 상세 구조](figures/20-node-detail.png)
+
+| 흐름 | 지나가는 길 |
+|---|---|
+| 에이전트 → 저장소 | 에이전트 → 노드 A `:4318` (HAProxy) → `127.0.0.1:8429` vmagent → ① `127.0.0.1:8428` VictoriaMetrics, ② 노드 B `:7443/vm` → B 의 `127.0.0.1:8428` |
+| 노드 A 의 중계가 죽었을 때 | 에이전트 → 노드 A `:4318` → (로컬 vmagent 가 없음) → 노드 B `:7443/vmagent` → B 의 vmagent → 양쪽 저장소 |
+| 노드 A 가 통째로 죽었을 때 | 에이전트가 다음 주소(노드 B `:4318`)로 보낸다. B 의 중계는 A 몫을 디스크 큐에 쌓는다 |
+| 관리 서버 → 조회 | 노드 A `:8443/metrics/...` → 앞부분을 떼고 `127.0.0.1:8428`. 로컬 저장소가 죽었으면 노드 B `:7443/vm` |
+| vmalert | 데이터소스 `:8443/metrics`(로그 규칙은 `/metrics/select/logsql/` 이 VictoriaLogs 로), 기록 `:4318/api/v1/write`, 알림 `127.0.0.1:9093` 과 노드 B `:7443/am` |
+| Alertmanager 끼리 | 노드 IP `:9094` (TCP · UDP) 로 상태를 맞춰 같은 알림을 한 번만 보낸다 |
+
+로그(`/v1/logs` → vlagent → `/vl`)와 트레이스(`/v1/traces` → vtagent → `/vt`)도 메트릭과 같은 모양이다.
+
 ---
 
 ## 6. 장애가 나면
@@ -421,7 +436,7 @@
 - 라벨은 `chcon` 으로 붙이지 않는다. `chcon` 은 전체 재라벨링(`restorecon -R`, `/.autorelabel`) 때 정책 기본값으로 돌아간다. **`semanage fcontext -a -t bin_t '<설치경로>/bin(/.*)?'` 로 규칙을 등록하고 `restorecon` 한다.** `semanage`(policycoreutils-python-utils) 가 없는 OS 만 `chcon` 으로 둔다.
 - 컨테이너를 안 쓰므로 `container_t` · `/dev/nvidia*` 장치 라벨(`xserver_misc_device_t`) · `:z` 마운트 문제가 생기지 않는다.
 - OBI 는 별도 프로세스로 root 또는 CAP_BPF · PERFMON 등을 준다. 에이전트 본체는 높은 권한이 필요 없다. SELinux 가 BPF 로드를 막는지는 공식 문서에 언급이 없어 PoC 에서 본다.
-- **중앙 노드의 HAProxy**: 배포판 패키지의 HAProxy 는 SELinux 의 `haproxy_t` 도메인에 갇힌다. 기본 정책은 HTTP 계열 포트만 허용하므로, 4318 · 8443 · 7443 같은 포트를 열고 127.0.0.1 의 8429 등에 붙으려면 `haproxy_connect_any` 불리언을 켜거나 포트를 `semanage port` 로 등록해야 한다. 어느 쪽이 필요한지는 PoC 에서 AVC 로 확인한다.
+- **중앙 노드의 HAProxy**: 배포판 패키지의 HAProxy 는 SELinux 의 `haproxy_t` 도메인에 갇힌다. **PoC(Rocky 10.2, Enforcing)에서 확인했다**: 허용 없이 띄우면 4318 · 7443 · 8404 를 열지 못하고(`cannot bind socket (Permission denied)`) 시작이 실패한다. 8443 은 정책에 웹 포트(`http_port_t`)로 등록돼 있어 열린다. 이 거부는 AVC 로 남지 않았다(기록하지 않는 dontaudit 규칙 때문으로 보지만 확인하지 않았다). `haproxy_connect_any` 를 켜면 모두 열리고 AVC 는 0건이다. 포트를 하나씩 `semanage port -a -t http_port_t` 로 등록하는 방법도 있다(더 좁은 허용).
 
 ### 8.4 vSphere 수집
 
@@ -521,6 +536,19 @@
 | 11 | Prometheus 전환 | 같은 OTLP 를 Prometheus 와 VictoriaMetrics 에 보내 시계열 이름 · 라벨이 같다. 조회와 vmalert 를 주소만 바꿔 Prometheus 로 돌린다 |
 | 12 | Windows | `cmp-otelcol` 이 Windows 서비스로 돌고 이벤트 로그 · 패킷 트레이스가 나온다 |
 | 13 | 하루 유입량 측정 | 신호별 하루 바이트 → 큐 한도와 디스크 크기 결정 |
+
+### 11.1 진행 결과 (2026-11-01)
+
+| 항목 | 결과 | 근거 |
+|---|---|---|
+| 중앙 2노드 설치 | 됨. 두 노드 모두 서비스 9개 `active`, 로컬 부품 `/health` 200 | `poc/checks/central-health.sh` 출력 |
+| 바깥 포트 | 두 노드 모두 4318 · 7443 · 8443 · 9094 만 노드 IP 에서 듣는다 (SSH 등 기존 것 제외) | `ss -ltn` |
+| 노드 사이 경로 | 상대 노드 `:7443/vm/health` · `/am/-/healthy` 200 | 위 출력 |
+| 복제 | vmagent 가 로컬 저장소와 상대 노드에 같은 바이트를 보냈고, 두 노드의 VictoriaMetrics 에 같은 샘플 수가 있다 | `vmagent_remotewrite_bytes_sent_total`, `count_over_time(ALERTS[10m])` |
+| 알림 경로 | vmalert → `:4318` 기록 → 양쪽 저장소, vmalert → Alertmanager 둘. Alertmanager 클러스터 `ready`, 피어 2개 | `/api/v2/status` |
+| SELinux (시험 8 일부) | Victoria 부품은 `unconfined_service_t`, HAProxy 는 `haproxy_t`. `haproxy_connect_any` 없이는 HAProxy 가 시작하지 못함. 켠 뒤 AVC 0건 | `ps -eZ`, `ausearch -m avc` |
+| 장애 시험 1~6 | 아직 안 함 | |
+| 에이전트 | 아직 안 함 | |
 
 ---
 

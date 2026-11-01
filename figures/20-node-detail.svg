@@ -1,0 +1,166 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1240" width="1600" height="1240" font-family="'Noto Sans CJK KR','Noto Sans KR','Malgun Gothic',sans-serif">
+<defs><marker id="m-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#475569"/></marker><marker id="s-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#475569"/></marker><marker id="m-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#2563eb"/></marker><marker id="s-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#2563eb"/></marker><marker id="m-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#ea580c"/></marker><marker id="s-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#ea580c"/></marker><marker id="m-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#059669"/></marker><marker id="s-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#059669"/></marker><marker id="m-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#dc2626"/></marker><marker id="s-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#dc2626"/></marker><marker id="m-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#7c3aed"/></marker><marker id="s-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#7c3aed"/></marker><marker id="m-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#d97706"/></marker><marker id="s-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#d97706"/></marker></defs>
+<rect width="1600" height="1240" fill="#ffffff"/>
+<text x="40" y="58" font-size="32" font-weight="700" fill="#0f172a">노드 사이 상세 구조 - 포트 · 경로 · 복제 흐름</text>
+<text x="40" y="92" font-size="18" fill="#475569">두 노드는 같은 구성이다. 바깥에는 HAProxy 의 4318 · 8443 · 7443 과 Alertmanager 9094 만 열리고, 부품은 127.0.0.1 에서만 듣는다</text>
+<rect x="40" y="150" width="180" height="110" rx="14" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+<text x="130.0" y="192.825" font-size="17" fill="#0f172a" font-weight="700" text-anchor="middle">에이전트</text>
+<text x="130.0" y="212.95" font-size="12.5" fill="#475569" font-weight="400" text-anchor="middle">OTLP/HTTP</text>
+<text x="130.0" y="231.075" font-size="12.5" fill="#475569" font-weight="400" text-anchor="middle">A,B 또는 B,A 순서</text>
+<rect x="40" y="330" width="180" height="110" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="130.0" y="372.825" font-size="17" fill="#0f172a" font-weight="700" text-anchor="middle">관리 서버</text>
+<text x="130.0" y="392.95" font-size="12.5" fill="#475569" font-weight="400" text-anchor="middle">조회 :8443</text>
+<text x="130.0" y="411.075" font-size="12.5" fill="#475569" font-weight="400" text-anchor="middle">webhook 수신</text>
+<rect x="40" y="760" width="180" height="110" rx="14" fill="#fffbeb" stroke="#d97706" stroke-width="2"/>
+<text x="130.0" y="802.475" font-size="16" fill="#92400e" font-weight="700" text-anchor="middle">기존 Prometheus</text>
+<text x="130.0" y="822.6" font-size="12.5" fill="#b45309" font-weight="400" text-anchor="middle">remote_write</text>
+<text x="130.0" y="840.725" font-size="12.5" fill="#b45309" font-weight="400" text-anchor="middle">→ :4318</text>
+<rect x="250" y="120" width="1310" height="500" rx="22" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="274" y="156" font-size="19" fill="#1d4ed8" font-weight="700" text-anchor="start">노드 A  (노드 IP 에서 듣는 것: 4318 · 8443 · 7443 · 9094)</text>
+<text x="380" y="190" font-size="15" fill="#1e40af" font-weight="700" text-anchor="middle">HAProxy (노드 IP)</text>
+<rect x="280" y="210" width="200" height="105" rx="14" fill="#ffffff" stroke="#3b82f6" stroke-width="2"/>
+<text x="380.0" y="251.42499999999998" font-size="16" fill="#0f172a" font-weight="700" text-anchor="middle">수집 :4318</text>
+<text x="380.0" y="270.09999999999997" font-size="11.5" fill="#475569" font-weight="400" text-anchor="middle">/v1/metrics · logs · traces</text>
+<text x="380.0" y="286.775" font-size="11.5" fill="#475569" font-weight="400" text-anchor="middle">/api/v1/write</text>
+<rect x="280" y="340" width="200" height="105" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="380.0" y="381.425" font-size="16" fill="#0f172a" font-weight="700" text-anchor="middle">조회 :8443</text>
+<text x="380.0" y="400.1" font-size="11.5" fill="#475569" font-weight="400" text-anchor="middle">/metrics · /logs · /traces</text>
+<text x="380.0" y="416.77500000000003" font-size="11.5" fill="#475569" font-weight="400" text-anchor="middle">앞부분을 떼고 넘김</text>
+<rect x="280" y="470" width="200" height="105" rx="14" fill="#fffbeb" stroke="#d97706" stroke-width="2"/>
+<text x="380.0" y="511.425" font-size="16" fill="#92400e" font-weight="700" text-anchor="middle">노드 사이 :7443</text>
+<text x="380.0" y="530.1" font-size="11.5" fill="#b45309" font-weight="400" text-anchor="middle">/vm /vl /vt /vmagent</text>
+<text x="380.0" y="546.775" font-size="11.5" fill="#b45309" font-weight="400" text-anchor="middle">/vlagent /vtagent /am</text>
+<text x="680" y="190" font-size="15" fill="#9a3412" font-weight="700" text-anchor="middle">중계 (127.0.0.1)</text>
+<rect x="580" y="210" width="200" height="68" rx="14" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="680.0" y="240.9125" font-size="15" fill="#9a3412" font-weight="700" text-anchor="middle">vmagent :8429</text>
+<text x="680.0" y="259.5875" font-size="11.5" fill="#9a3412" font-weight="400" text-anchor="middle">메트릭 · 목적지별 디스크 큐</text>
+<rect x="580" y="295" width="200" height="68" rx="14" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="680.0" y="325.9125" font-size="15" fill="#9a3412" font-weight="700" text-anchor="middle">vlagent :9429</text>
+<text x="680.0" y="344.58750000000003" font-size="11.5" fill="#9a3412" font-weight="400" text-anchor="middle">로그 · 목적지별 디스크 큐</text>
+<rect x="580" y="380" width="200" height="68" rx="14" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="680.0" y="410.9125" font-size="15" fill="#9a3412" font-weight="700" text-anchor="middle">vtagent :10429</text>
+<text x="680.0" y="429.58750000000003" font-size="11.5" fill="#9a3412" font-weight="400" text-anchor="middle">트레이스 · 목적지별 디스크 큐</text>
+<rect x="580" y="480" width="200" height="68" rx="14" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="680.0" y="510.9125" font-size="15" fill="#9a3412" font-weight="700" text-anchor="middle">vmalert :8880</text>
+<text x="680.0" y="529.5875" font-size="11.5" fill="#9a3412" font-weight="400" text-anchor="middle">규칙 평가</text>
+<text x="980" y="190" font-size="15" fill="#065f46" font-weight="700" text-anchor="middle">저장소 (127.0.0.1)</text>
+<rect x="880" y="210" width="200" height="68" rx="14" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="980.0" y="240.73749999999998" font-size="14.5" fill="#065f46" font-weight="700" text-anchor="middle">VictoriaMetrics :8428</text>
+<text x="980.0" y="259.41249999999997" font-size="11.5" fill="#047857" font-weight="400" text-anchor="middle">PromQL</text>
+<rect x="880" y="295" width="200" height="68" rx="14" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="980.0" y="325.7375" font-size="14.5" fill="#065f46" font-weight="700" text-anchor="middle">VictoriaLogs :9428</text>
+<text x="980.0" y="344.4125" font-size="11.5" fill="#047857" font-weight="400" text-anchor="middle">LogsQL</text>
+<rect x="880" y="380" width="200" height="68" rx="14" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="980.0" y="410.7375" font-size="14.5" fill="#065f46" font-weight="700" text-anchor="middle">VictoriaTraces :10428</text>
+<text x="980.0" y="429.4125" font-size="11.5" fill="#047857" font-weight="400" text-anchor="middle">Jaeger API</text>
+<rect x="880" y="480" width="200" height="68" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="980.0" y="511.275" font-size="15" fill="#0f172a" font-weight="700" text-anchor="middle">Alertmanager</text>
+<text x="980.0" y="529.225" font-size="11" fill="#475569" font-weight="400" text-anchor="middle">127.0.0.1:9093 · 노드 IP:9094</text>
+<path d="M480,262 C520,262 540,244 578,244" stroke="#2563eb" stroke-width="1.8" fill="none" marker-end="url(#m-blue)"/>
+<path d="M780,244 L878,244" stroke="#ea580c" stroke-width="2.5" fill="none" marker-end="url(#m-orange)"/>
+<path d="M480,262 C520,262 540,329 578,329" stroke="#2563eb" stroke-width="1.8" fill="none" marker-end="url(#m-blue)"/>
+<path d="M780,329 L878,329" stroke="#ea580c" stroke-width="2.5" fill="none" marker-end="url(#m-orange)"/>
+<path d="M480,262 C520,262 540,414 578,414" stroke="#2563eb" stroke-width="1.8" fill="none" marker-end="url(#m-blue)"/>
+<path d="M780,414 L878,414" stroke="#ea580c" stroke-width="2.5" fill="none" marker-end="url(#m-orange)"/>
+<path d="M480,420 C530,466 830,466 878,430" stroke="#059669" stroke-width="1.8" fill="none" marker-end="url(#m-green)"/>
+<path d="M480,522 C520,522 540,480 578,260" stroke="#d97706" stroke-width="1.4" fill="none" stroke-dasharray="4 4" marker-end="url(#m-amber)"/>
+<path d="M480,530 C700,590 820,590 878,530" stroke="#d97706" stroke-width="1.4" fill="none" stroke-dasharray="4 4" marker-end="url(#m-amber)"/>
+<path d="M780,514 L878,514" stroke="#7c3aed" stroke-width="2" fill="none" marker-end="url(#m-purple)"/>
+<text x="1120" y="230" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start">중계는 두 곳에 쓴다:</text>
+<text x="1120" y="257" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start">  ① 127.0.0.1 저장소</text>
+<text x="1120" y="284" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start">  ② 노드 B :7443/vm · /vl · /vt</text>
+<text x="1120" y="311" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start"></text>
+<text x="1120" y="338" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start">로컬이 죽으면 HAProxy 가</text>
+<text x="1120" y="365" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start">  노드 B :7443 의 같은 부품으로</text>
+<text x="1120" y="392" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start"></text>
+<text x="1120" y="419" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start">vmalert</text>
+<text x="1120" y="446" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start">  데이터소스 :8443/metrics</text>
+<text x="1120" y="473" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start">  기록 :4318/api/v1/write</text>
+<text x="1120" y="500" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start">  알림 127.0.0.1:9093 + 노드 B :7443/am</text>
+<rect x="250" y="700" width="1310" height="500" rx="22" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="274" y="736" font-size="19" fill="#1d4ed8" font-weight="700" text-anchor="start">노드 B  (노드 IP 에서 듣는 것: 4318 · 8443 · 7443 · 9094)</text>
+<text x="380" y="770" font-size="15" fill="#1e40af" font-weight="700" text-anchor="middle">HAProxy (노드 IP)</text>
+<rect x="280" y="790" width="200" height="105" rx="14" fill="#ffffff" stroke="#3b82f6" stroke-width="2"/>
+<text x="380.0" y="831.4250000000001" font-size="16" fill="#0f172a" font-weight="700" text-anchor="middle">수집 :4318</text>
+<text x="380.0" y="850.1" font-size="11.5" fill="#475569" font-weight="400" text-anchor="middle">/v1/metrics · logs · traces</text>
+<text x="380.0" y="866.7750000000001" font-size="11.5" fill="#475569" font-weight="400" text-anchor="middle">/api/v1/write</text>
+<rect x="280" y="920" width="200" height="105" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="380.0" y="961.4250000000001" font-size="16" fill="#0f172a" font-weight="700" text-anchor="middle">조회 :8443</text>
+<text x="380.0" y="980.1" font-size="11.5" fill="#475569" font-weight="400" text-anchor="middle">/metrics · /logs · /traces</text>
+<text x="380.0" y="996.7750000000001" font-size="11.5" fill="#475569" font-weight="400" text-anchor="middle">앞부분을 떼고 넘김</text>
+<rect x="280" y="1050" width="200" height="105" rx="14" fill="#fffbeb" stroke="#d97706" stroke-width="2"/>
+<text x="380.0" y="1091.425" font-size="16" fill="#92400e" font-weight="700" text-anchor="middle">노드 사이 :7443</text>
+<text x="380.0" y="1110.1" font-size="11.5" fill="#b45309" font-weight="400" text-anchor="middle">/vm /vl /vt /vmagent</text>
+<text x="380.0" y="1126.7749999999999" font-size="11.5" fill="#b45309" font-weight="400" text-anchor="middle">/vlagent /vtagent /am</text>
+<text x="680" y="770" font-size="15" fill="#9a3412" font-weight="700" text-anchor="middle">중계 (127.0.0.1)</text>
+<rect x="580" y="790" width="200" height="68" rx="14" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="680.0" y="820.9125" font-size="15" fill="#9a3412" font-weight="700" text-anchor="middle">vmagent :8429</text>
+<text x="680.0" y="839.5875" font-size="11.5" fill="#9a3412" font-weight="400" text-anchor="middle">메트릭 · 목적지별 디스크 큐</text>
+<rect x="580" y="875" width="200" height="68" rx="14" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="680.0" y="905.9125" font-size="15" fill="#9a3412" font-weight="700" text-anchor="middle">vlagent :9429</text>
+<text x="680.0" y="924.5875" font-size="11.5" fill="#9a3412" font-weight="400" text-anchor="middle">로그 · 목적지별 디스크 큐</text>
+<rect x="580" y="960" width="200" height="68" rx="14" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="680.0" y="990.9125" font-size="15" fill="#9a3412" font-weight="700" text-anchor="middle">vtagent :10429</text>
+<text x="680.0" y="1009.5875" font-size="11.5" fill="#9a3412" font-weight="400" text-anchor="middle">트레이스 · 목적지별 디스크 큐</text>
+<rect x="580" y="1060" width="200" height="68" rx="14" fill="#fff7ed" stroke="#ea580c" stroke-width="2"/>
+<text x="680.0" y="1090.9125" font-size="15" fill="#9a3412" font-weight="700" text-anchor="middle">vmalert :8880</text>
+<text x="680.0" y="1109.5874999999999" font-size="11.5" fill="#9a3412" font-weight="400" text-anchor="middle">규칙 평가</text>
+<text x="980" y="770" font-size="15" fill="#065f46" font-weight="700" text-anchor="middle">저장소 (127.0.0.1)</text>
+<rect x="880" y="790" width="200" height="68" rx="14" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="980.0" y="820.7375000000001" font-size="14.5" fill="#065f46" font-weight="700" text-anchor="middle">VictoriaMetrics :8428</text>
+<text x="980.0" y="839.4125" font-size="11.5" fill="#047857" font-weight="400" text-anchor="middle">PromQL</text>
+<rect x="880" y="875" width="200" height="68" rx="14" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="980.0" y="905.7375000000001" font-size="14.5" fill="#065f46" font-weight="700" text-anchor="middle">VictoriaLogs :9428</text>
+<text x="980.0" y="924.4125" font-size="11.5" fill="#047857" font-weight="400" text-anchor="middle">LogsQL</text>
+<rect x="880" y="960" width="200" height="68" rx="14" fill="#ecfdf5" stroke="#059669" stroke-width="2"/>
+<text x="980.0" y="990.7375000000001" font-size="14.5" fill="#065f46" font-weight="700" text-anchor="middle">VictoriaTraces :10428</text>
+<text x="980.0" y="1009.4125" font-size="11.5" fill="#047857" font-weight="400" text-anchor="middle">Jaeger API</text>
+<rect x="880" y="1060" width="200" height="68" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="980.0" y="1091.275" font-size="15" fill="#0f172a" font-weight="700" text-anchor="middle">Alertmanager</text>
+<text x="980.0" y="1109.2250000000001" font-size="11" fill="#475569" font-weight="400" text-anchor="middle">127.0.0.1:9093 · 노드 IP:9094</text>
+<path d="M480,842 C520,842 540,824 578,824" stroke="#2563eb" stroke-width="1.8" fill="none" marker-end="url(#m-blue)"/>
+<path d="M780,824 L878,824" stroke="#ea580c" stroke-width="2.5" fill="none" marker-end="url(#m-orange)"/>
+<path d="M480,842 C520,842 540,909 578,909" stroke="#2563eb" stroke-width="1.8" fill="none" marker-end="url(#m-blue)"/>
+<path d="M780,909 L878,909" stroke="#ea580c" stroke-width="2.5" fill="none" marker-end="url(#m-orange)"/>
+<path d="M480,842 C520,842 540,994 578,994" stroke="#2563eb" stroke-width="1.8" fill="none" marker-end="url(#m-blue)"/>
+<path d="M780,994 L878,994" stroke="#ea580c" stroke-width="2.5" fill="none" marker-end="url(#m-orange)"/>
+<path d="M480,1000 C530,1046 830,1046 878,1010" stroke="#059669" stroke-width="1.8" fill="none" marker-end="url(#m-green)"/>
+<path d="M480,1102 C520,1102 540,1060 578,840" stroke="#d97706" stroke-width="1.4" fill="none" stroke-dasharray="4 4" marker-end="url(#m-amber)"/>
+<path d="M480,1110 C700,1170 820,1170 878,1110" stroke="#d97706" stroke-width="1.4" fill="none" stroke-dasharray="4 4" marker-end="url(#m-amber)"/>
+<path d="M780,1094 L878,1094" stroke="#7c3aed" stroke-width="2" fill="none" marker-end="url(#m-purple)"/>
+<text x="1120" y="810" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start">중계는 두 곳에 쓴다:</text>
+<text x="1120" y="837" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start">  ① 127.0.0.1 저장소</text>
+<text x="1120" y="864" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start">  ② 노드 A :7443/vm · /vl · /vt</text>
+<text x="1120" y="891" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start"></text>
+<text x="1120" y="918" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start">로컬이 죽으면 HAProxy 가</text>
+<text x="1120" y="945" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start">  노드 A :7443 의 같은 부품으로</text>
+<text x="1120" y="972" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start"></text>
+<text x="1120" y="999" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start">vmalert</text>
+<text x="1120" y="1026" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start">  데이터소스 :8443/metrics</text>
+<text x="1120" y="1053" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start">  기록 :4318/api/v1/write</text>
+<text x="1120" y="1080" font-size="13.5" fill="#334155" font-weight="400" text-anchor="start">  알림 127.0.0.1:9093 + 노드 A :7443/am</text>
+<path d="M220,205 C240,205 250,200 278,200" stroke="#2563eb" stroke-width="2.8" fill="none" marker-end="url(#m-blue)"/>
+<path d="M220,230 C240,600 250,780 278,780" stroke="#2563eb" stroke-width="2.2" fill="none" stroke-dasharray="7 5" marker-end="url(#m-blue)"/>
+<path d="M220,385 C245,385 250,330 278,330" stroke="#059669" stroke-width="2.5" fill="none" marker-end="url(#m-green)"/>
+<path d="M220,410 C245,700 250,910 278,910" stroke="#059669" stroke-width="1.8" fill="none" stroke-dasharray="7 5" marker-end="url(#m-green)"/>
+<path d="M220,815 C245,815 250,790 278,790" stroke="#2563eb" stroke-width="2" fill="none" marker-end="url(#m-blue)"/>
+<path d="M780,215 L822,215 L822,1180 L380,1180 L380,1158" stroke="#ea580c" stroke-width="3" fill="none" stroke-dasharray="8 6" marker-end="url(#m-orange)"/>
+<path d="M780,885 L848,885 L848,600 L380,600 L380,578" stroke="#ea580c" stroke-width="3" fill="none" stroke-dasharray="8 6" marker-end="url(#m-orange)"/>
+<rect x="858" y="628" width="210" height="50" rx="8" fill="#ffffff"/>
+<text x="963" y="648" font-size="13" fill="#ea580c" font-weight="700" text-anchor="middle">상대 노드 :7443 으로 복제</text>
+<text x="963" y="666" font-size="13" fill="#ea580c" font-weight="700" text-anchor="middle">(vm · vl · vt)</text>
+<path d="M1080,505 C1110,560 1110,640 1080,1085" stroke="#7c3aed" stroke-width="2.4" fill="none" stroke-dasharray="5 4" marker-end="url(#m-purple)" marker-start="url(#s-purple)"/>
+<rect x="1095" y="600" width="140" height="46" rx="8" fill="#ffffff"/>
+<text x="1165" y="620" font-size="13" fill="#7c3aed" font-weight="700" text-anchor="middle">Alertmanager</text>
+<text x="1165" y="638" font-size="13" fill="#7c3aed" font-weight="700" text-anchor="middle">클러스터 :9094</text>
+<line x1="40" y1="1215" x2="86" y2="1215" stroke="#2563eb" stroke-width="3"/>
+<text x="96" y="1220" font-size="15" fill="#334155" font-weight="400" text-anchor="start">수집</text>
+<line x1="166" y1="1215" x2="212" y2="1215" stroke="#ea580c" stroke-width="3"/>
+<text x="222" y="1220" font-size="15" fill="#334155" font-weight="400" text-anchor="start">저장소 기록 (점선 = 상대 노드)</text>
+<line x1="547" y1="1215" x2="593" y2="1215" stroke="#059669" stroke-width="3"/>
+<text x="603" y="1220" font-size="15" fill="#334155" font-weight="400" text-anchor="start">조회</text>
+<line x1="673" y1="1215" x2="719" y2="1215" stroke="#d97706" stroke-width="3" stroke-dasharray="4 4"/>
+<text x="729" y="1220" font-size="15" fill="#334155" font-weight="400" text-anchor="start">:7443 로 들어온 상대 노드 요청</text>
+<line x1="1069" y1="1215" x2="1115" y2="1215" stroke="#7c3aed" stroke-width="3"/>
+<text x="1125" y="1220" font-size="15" fill="#334155" font-weight="400" text-anchor="start">알림</text>
+</svg>
