@@ -34,7 +34,7 @@ printf 'query  토큰 없이         %s (401 이어야 함)\n' "$(hcode "X: y" h
 if [ -n "$PEER" ]; then
   printf 'peer   %s:7443/vm/health %s\n' "$PEER" "$(hcode "$P" https://$PEER:7443/vm/health)"
   printf 'peer   %s:7443/am        %s\n' "$PEER" "$(hcode "$P" https://$PEER:7443/am/-/healthy)"
-  printf 'peer   조회 토큰으로     %s (401 이어야 함)\n' "$(hcode "$Q" https://$PEER:7443/vm/health)"
+  printf 'peer   조회 토큰으로     %s (4xx 로 거부돼야 함)\n' "$(hcode "$Q" https://$PEER:7443/vm/health)"
 else
   echo "단일 노드: 상대 노드 없음"
 fi

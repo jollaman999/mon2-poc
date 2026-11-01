@@ -67,7 +67,7 @@ TLS_VERIFY=${TLS_VERIFY:-skip}
 EOF
   echo "=== $self: 올리는 중"
   tar czf - -C "$bundle" . | timeout 600 ssh "${ssh_opts[@]}" "$SSH_USER@$self" \
-    'rm -rf /tmp/$NAME-bundle && mkdir -p /tmp/$NAME-bundle && tar xzf - -C /tmp/$NAME-bundle'
+    "rm -rf /tmp/$NAME-bundle && mkdir -p /tmp/$NAME-bundle && tar xzf - -C /tmp/$NAME-bundle"
   echo "=== $self: 설치"
   timeout 900 ssh -n "${ssh_opts[@]}" "$SSH_USER@$self" \
     "sudo bash /tmp/$NAME-bundle/install.sh && rm -rf /tmp/$NAME-bundle"
