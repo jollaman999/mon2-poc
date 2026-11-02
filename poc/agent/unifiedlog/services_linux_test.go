@@ -564,10 +564,13 @@ func TestServices_EndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = r.Shutdown(context.Background()) }()
+	// 이 프로세스가 쓰기로 연 다른 fd(make 의 출력 리다이렉트 등)도 잡힐 수 있어 개수가 아니라 이 시험이 만든 두 경로만 본다.
 	eventually(t, 5*time.Second, func() bool {
 		r.servicesSrc.tailersMu.Lock()
 		defer r.servicesSrc.tailersMu.Unlock()
-		return len(r.servicesSrc.tailers) == 2
+		_, a := r.servicesSrc.tailers[appLog]
+		_, b := r.servicesSrc.tailers[ctrLog]
+		return a && b
 	}, "두 파일을 읽기 시작하지 않았다")
 	time.Sleep(50 * time.Millisecond)
 
@@ -576,11 +579,17 @@ func TestServices_EndToEnd(t *testing.T) {
 	}
 	appendFile(t, ctrLog, `{"log":"GET / 200\n","stream":"stdout","time":"2026-04-22T10:15:30Z"}`+"\n")
 
-	got := waitLogs(t, sink, 2)
+	// 다른 fd 에서 온 레코드가 섞여도 되게 이 시험이 쓴 두 줄이 올 때까지 기다린다.
 	byBody := map[string]flat{}
-	for _, g := range got {
-		byBody[g.body] = g
-	}
+	eventually(t, 10*time.Second, func() bool {
+		for _, g := range sinkLogs(sink) {
+			byBody[g.body] = g
+		}
+		_, a := byBody["2026-04-22 app started"]
+		_, b := byBody["GET / 200"]
+		return a && b
+	}, "두 줄이 오지 않았다")
+	got := sinkLogs(sink)
 	app, ok := byBody["2026-04-22 app started"]
 	if !ok {
 		t.Fatalf("앱 로그가 없다: %v", got)
