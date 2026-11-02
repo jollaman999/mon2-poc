@@ -1,0 +1,17 @@
+vsphere:
+  vcenters: ["https://vcenter.example.com/sdk"]
+  username: monitor@vsphere.local
+  tls:
+    insecure_skip_verify: true
+  collection_interval: 60s
+  host_metric_include:
+    - cpu.ready.summation
+    - cpu.usage.average
+  vm_metric_include:
+    - cpu.ready.summation
+  cluster_metric_exclude: ["*"]
+  ip_addresses: [ipv4]
+  disconnected_servers_behavior: error
+  events:
+    batch_size: 100
+    lookback_on_first_run: 10m
