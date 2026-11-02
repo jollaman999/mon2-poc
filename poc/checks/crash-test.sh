@@ -37,8 +37,8 @@ load_pid=$!
 sleep "$kill_at"
 case $mode in
   relay)
-    log "노드 A vmagent kill -9 (systemd 가 3초 뒤 다시 띄운다)"
-    on "$NODE_A" "sudo pkill -9 -f '^/$NAME/bin/vmagent-prod|/bin/vmagent-prod'" || true
+    log "노드 A vmagent kill -9 (컨테이너가 죽으면 podman 이 restart: always 로 다시 띄운다)"
+    on "$NODE_A" "sudo kill -9 \$(sudo podman inspect -f '{{.State.Pid}}' $NAME-vmagent)" || true
     ;;
   node)
     log "노드 B 강제 재시작 (openstack server reboot --hard $SERVER_B)"
@@ -49,10 +49,11 @@ wait "$load_pid" || true
 cat "$out"
 result=$(tail -1 "$out"); rm -f "$out"
 if [ "$mode" = node ]; then
-  for i in $(seq 1 60); do on "$NODE_B" "systemctl is-active $NAME-victoria-metrics $NAME-vmagent $NAME-gateway" >/dev/null 2>&1 && break; sleep 10; done
-  log "노드 B 서비스: $(on "$NODE_B" "systemctl is-active $NAME-victoria-metrics $NAME-vmagent $NAME-gateway | tr '\n' ' '")"
+  up() { on "$NODE_B" "sudo podman ps --filter name=^$NAME- --filter status=running --format '{{.Names}}' | grep -cE '$NAME-(victoria-metrics|vmagent|gateway)\$'"; }
+  for _ in $(seq 1 60); do [ "$(up 2>/dev/null)" = 3 ] && break; sleep 10; done
+  log "노드 B 컨테이너: $(on "$NODE_B" "sudo podman ps -a --filter name=^$NAME- --format '{{.Names}}={{.Status}}' | tr '\n' ' '")"
 fi
-for i in $(seq 1 60); do
+for _ in $(seq 1 60); do
   qa=$(queue "$NODE_A"); qb=$(queue "$NODE_B")
   [ "$qa" = 0 ] && [ "$qb" = 0 ] && break; sleep 5
 done

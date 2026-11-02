@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# 장애 시험 도구. 서비스 정지 · 노드 사이 차단을 걸고, 두 노드 저장소의 샘플 수와 중계 큐를 비교한다.
+# 장애 시험 도구. 컨테이너 정지 · 노드 사이 차단을 걸고, 두 노드 저장소의 샘플 수와 중계 큐를 비교한다.
 #
 #   checks/failover.sh count [구간] [끝시각]  두 노드 VictoriaMetrics 에서 같은 구간의 샘플 수 (기본 30m, 끝시각 = 60초 전)
 #   checks/failover.sh queue                 두 노드 중계(vmagent · vlagent · vtagent)의 목적지별 미전송 바이트
-#   checks/failover.sh stop  A|B 서비스...   서비스 정지 (예: stop B victoria-metrics gateway, 앞말 NAME- 은 붙여 준다)
-#   checks/failover.sh start A|B 서비스...   서비스 시작
+#   checks/failover.sh stop  A|B 부품...     컨테이너 정지 (예: stop B victoria-metrics gateway, 앞말 NAME- 은 붙여 준다)
+#   checks/failover.sh start A|B 부품...     컨테이너 시작
 #   checks/failover.sh cut   A 분            A 에서 상대 노드와의 통신을 막는다. 분이 지나면 저절로 풀린다
 #   checks/failover.sh heal  A               막은 것을 바로 푼다
 set -euo pipefail
@@ -43,9 +43,9 @@ case "$cmd" in
     ;;
   stop|start)
     n=$1; shift
-    units=""; for x in "$@"; do units="$units $NAME-$x"; done
-    on "$n" "sudo systemctl $cmd $units"
-    on "$n" "for s in $units; do printf '%-26s %s\n' \$s \$(systemctl is-active \$s); done"
+    names=""; for x in "$@"; do names="$names $NAME-$x"; done
+    on "$n" "sudo podman $cmd $names >/dev/null"
+    on "$n" "for c in $names; do printf '%-26s %s\n' \$c \"\$(sudo podman ps -a --filter name=^\$c\\$ --format '{{.Status}}')\"; done"
     ;;
   cut)
     n=$1; mins=${2:-5}; peer=$(peer_of "$n")

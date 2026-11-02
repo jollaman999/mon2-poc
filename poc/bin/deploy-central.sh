@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
-# 중앙 노드 A · B 에 central/install.sh 를 돌린다.
-# 사용: bin/deploy-central.sh [A|B|all]           설치 (기본 all)
-#       bin/deploy-central.sh uninstall [A|B|all] 삭제 (데이터 포함)
-# 미리: cp inventory.example.env inventory.env 후 값 채우기, bin/fetch.sh
+# 중앙 노드 A · B 에 묶음(설치 스크립트 · compose · Podman RPM · 이미지)을 올리고 central/install.sh 를 돌린다.
+# 사용: bin/deploy-central.sh [A|B|all]                     설치 (기본 all)
+#       bin/deploy-central.sh uninstall [--purge] [A|B|all] 컨테이너 · 설정 삭제. --purge 면 데이터 · 이미지까지
+# 미리: cp inventory.example.env inventory.env 후 값 채우기,
+#       bin/fetch-podman.sh <Podman 원본 묶음 폴더>, bin/fetch-images.sh   (dist/podman-el10, dist/images)
 #
 # inventory.env 의 NODE_B 를 비우면 단일 노드, 채우면 이중화로 설치한다.
 #   단일 → 이중화: NODE_B 를 채우고 all 로 다시 돌린 뒤 bin/backfill-metrics.sh 로 과거 메트릭을 채운다
-#   이중화 → 단일: NODE_B 를 비우고 A 로 다시 돌린 뒤, 노드 B 의 서비스를 내린다
+#   이중화 → 단일: NODE_B 를 비우고 A 로 다시 돌린 뒤, 노드 B 의 컨테이너를 내린다
 set -euo pipefail
 cd "$(dirname "$0")/.."
 . ./inventory.env
 . ./versions.env
-action=install
+action=install; purge=""
 [ "${1:-}" = uninstall ] && { action=uninstall; shift; }
+[ "$action" = uninstall ] && [ "${1:-}" = --purge ] && { purge=--purge; shift; }
 target=${1:-all}
 NAME=${NAME:-cmp-mon}
 
@@ -49,11 +51,9 @@ make_secrets() {
 deploy_one() { # self peer
   local self=$1 peer=$2 bundle
   bundle=$(mktemp -d)
-  cp -r central/conf central/systemd central/install.sh central/gen-gateway.sh central/reconcile-metrics.sh versions.env "$bundle/"
+  cp -r central/conf central/compose central/install.sh central/gen-gateway.sh central/reconcile-metrics.sh versions.env "$bundle/"
   mkdir -p "$bundle/secrets"
   cp secrets/ca.pem secrets/server.pem secrets/server.key secrets/peer.token secrets/query.token "$bundle/secrets/"
-  mkdir -p "$bundle/dist"
-  cp dist/*.tar.gz "$bundle/dist/"
   cat > "$bundle/node.env" <<EOF
 SELF=$self
 PEER=$peer
@@ -65,18 +65,20 @@ QUEUE_MAX=$QUEUE_MAX
 WEBHOOK=${WEBHOOK:-$self:5001}
 TLS_VERIFY=${TLS_VERIFY:-skip}
 EOF
-  echo "=== $self: 올리는 중"
-  tar czf - -C "$bundle" . | timeout 600 ssh "${ssh_opts[@]}" "$SSH_USER@$self" \
-    "rm -rf /tmp/$NAME-bundle && mkdir -p /tmp/$NAME-bundle && tar xzf - -C /tmp/$NAME-bundle"
+  echo "=== $self: 올리는 중 (RPM $(du -sh dist/podman-el10 | cut -f1), 이미지 $(du -sh dist/images | cut -f1))"
+  # RPM · 이미지는 이미 압축돼 있어 압축하지 않고, dist/ 를 복사하지 않고 tar 가 바로 읽는다
+  tar cf - -C "$bundle" . -C "$PWD/dist" podman-el10 images | timeout 1800 ssh "${ssh_opts[@]}" "$SSH_USER@$self" \
+    "rm -rf /tmp/$NAME-bundle && mkdir -p /tmp/$NAME-bundle && tar xf - -C /tmp/$NAME-bundle"
   echo "=== $self: 설치"
-  timeout 900 ssh -n "${ssh_opts[@]}" "$SSH_USER@$self" \
+  timeout 1800 ssh -n "${ssh_opts[@]}" "$SSH_USER@$self" \
     "sudo bash /tmp/$NAME-bundle/install.sh && rm -rf /tmp/$NAME-bundle"
   rm -rf "$bundle"
 }
 
 uninstall_one() { # node
   echo "=== $1: 삭제"
-  timeout 600 ssh -n "${ssh_opts[@]}" "$SSH_USER@$1" "sudo bash -s ${BASE_DIR:-/$NAME}" < central/uninstall.sh
+  # 스크립트를 표준 입력으로 넘기므로 이 줄만 ssh 에 -n 을 주지 않는다
+  timeout 600 ssh "${ssh_opts[@]}" "$SSH_USER@$1" "sudo bash -s -- $purge ${BASE_DIR:-/$NAME}" < central/uninstall.sh
 }
 
 if [ "$action" = uninstall ]; then
@@ -88,6 +90,9 @@ if [ "$action" = uninstall ]; then
   exit 0
 fi
 
+for f in dist/podman-el10/SHA256SUMS dist/images/SHA256SUMS; do
+  [ -s "$f" ] || { echo "$f 가 없다. bin/fetch-podman.sh · bin/fetch-images.sh 를 먼저 돌린다" >&2; exit 1; }
+done
 make_secrets
 case "$target" in
   A)   deploy_one "$NODE_A" "${NODE_B:-}" ;;

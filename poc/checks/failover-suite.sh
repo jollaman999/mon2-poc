@@ -2,7 +2,7 @@
 # 장애 시험 묶음. 설계 문서 11절의 시험 4 · 2 · 3 을 차례로 돌리고 결과를 출력한다.
 # 사용: checks/failover-suite.sh [4] [2] [3]   (기본 전부)
 #   4  노드 A 의 vmagent 만 정지 → A 의 vmauth 가 B 의 중계로 넘기는가
-#   2  노드 B 의 서비스를 모두 정지 → A 가 계속 받고 B 몫을 쌓는가, 복구 뒤 두 노드 샘플 수가 같은가
+#   2  노드 B 의 컨테이너를 모두 정지 → A 가 계속 받고 B 몫을 쌓는가, 복구 뒤 두 노드 샘플 수가 같은가
 #   3  노드 A 에서 B 와의 통신 차단 → 각자 받고, 풀린 뒤 같아지는가
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -39,7 +39,7 @@ for t in $tests; do
     $F count 5m
     ;;
   2)
-    log "== 시험 2: 노드 B 의 서비스를 모두 정지 (3분)"
+    log "== 시험 2: 노드 B 의 컨테이너를 모두 정지 (3분)"
     $F stop B gateway vmalert alertmanager vmagent vlagent vtagent victoria-metrics victoria-logs victoria-traces >/dev/null
     sleep 180
     log "A 조회 (조회 토큰): $(on "$NODE_A" "curl -sk -o /dev/null -w '%{http_code}' -H \"Authorization: Bearer \$(sudo cat $BASE/conf/tokens/query.token)\" https://$NODE_A:8443/metrics/api/v1/query?query=up")"

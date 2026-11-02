@@ -273,8 +273,8 @@
 
 | 비교 | HAProxy (배포판 RPM) | **vmauth (선택)** |
 |---|---|---|
-| 배포 | 배포판마다 다른 패키지, 동적 링크 | **정적 Go 바이너리.** 이미 쓰는 vmutils 안에 있다. 설치 폴더 아래에 그대로 둔다 |
-| SELinux | `haproxy_t` 에 갇힌다. **PoC(Rocky 10.2)에서 `haproxy_connect_any` 없이는 4318 · 7443 을 열지 못하고 시작에 실패했다.** 이 거부는 AVC 로도 남지 않았다 | 다른 Victoria 부품처럼 `unconfined_service_t` 로 돈다. 불리언이 필요 없다 (PoC 에서 AVC 0건) |
+| 배포 | 배포판마다 다른 패키지, 동적 링크 | **공식 이미지 `victoriametrics/vmauth`.** 다른 Victoria 부품과 같은 방식으로 올린다 (5.5) |
+| SELinux | `haproxy_t` 에 갇힌다. **PoC(Rocky 10.2)에서 `haproxy_connect_any` 없이는 4318 · 7443 을 열지 못하고 시작에 실패했다.** 이 거부는 AVC 로도 남지 않았다 | 다른 Victoria 부품처럼 컨테이너(`container_t`, host 네트워크)로 돈다. 불리언이 필요 없다 (PoC 에서 AVC 0건) |
 | 경로로 나누기 · 앞말 떼기 | 된다 | 된다 (`src_paths`, `drop_src_path_prefix_parts`) |
 | 로컬 먼저, 죽으면 상대 노드 | 된다 (`backup`, `nbsrv`) | 된다 (`load_balancing_policy: first_available`) |
 | 상태 검사 | 주기적으로 검사한다 | **실패한 요청으로만 알아챈다** (`-failTimeout`). 첫 실패 요청은 다음 백엔드로 다시 보낸다 (`retry_status_codes`) |
@@ -282,7 +282,7 @@
 | 출발지 IP 제한 | 된다 | **Enterprise 전용**(`ip_filters`). 그래서 경로를 토큰으로 막는다 (5.4) |
 | 유지 | 배포판이 패치 | Victoria 릴리스와 같이 올린다. Apache-2.0 |
 
-**고른 이유**: 설치 폴더 하나에 정적 바이너리만 두는 원칙(8.3)과 맞고, SELinux 를 따로 풀 필요가 없다. 출발지 제한이 없는 것은 토큰과 OS 방화벽으로 메운다.
+**고른 이유**: 다른 Victoria 부품과 같은 방식(공식 이미지, 5.5)으로 깔리고, SELinux 를 따로 풀 필요가 없다. 출발지 제한이 없는 것은 토큰과 OS 방화벽으로 메운다.
 
 ### 3.11 에이전트는 한 곳에 보낸다 - 두 곳에 직접 보내기와 비교
 
@@ -515,13 +515,27 @@
 
 ### 5.5 설치 위치와 폴더 구조
 
-**한 폴더 아래에 모두 둔다.** 기본은 `/cmp-mon` 이고 설치할 때 바꿀 수 있다 (`BASE_DIR`). 서비스 이름 앞말과 실행 계정도 같은 이름(`NAME`, 기본 `cmp-mon`)을 따른다.
+**중앙 노드의 부품은 모두 컨테이너로 띄운다** (Podman + podman-compose). 이미지는 각 제품의 공식 이미지(`victoriametrics/*`, `prom/alertmanager`)를 그대로 쓴다. 노드는 인터넷에 나가지 않으므로 Podman RPM · podman-compose · 이미지를 묶음으로 올려 오프라인으로 깐다(`poc/bin/fetch-podman.sh`, `poc/bin/fetch-images.sh`).
+
+| 무엇 | 어떻게 |
+|---|---|
+| 네트워크 | 모든 컨테이너가 `network_mode: host`. 듣는 주소 · 포트는 5절 그대로다 (바깥은 vmauth 4318 · 8443 · 7443, Alertmanager 9094) |
+| 실행 계정 | 컨테이너 안 프로세스를 서비스 계정의 uid · gid 로 돌린다. 설정 · 데이터 파일 소유가 호스트와 같다 |
+| 설정 · 데이터 | 호스트의 `BASE_DIR` 아래를 같은 경로로 bind mount 한다 |
+| 다시 띄우기 | `restart: always`. 프로세스가 죽으면 podman 이 다시 띄우고, 부팅 때는 podman 패키지의 `podman-restart.service` 가 띄운다 |
+| 로그 | podman 이 `logs/<부품>.log` 에 쓴다 (`podman logs` 로도 본다). 50MB 를 넘으면 비우고 다시 쓴다 |
+| 단일 · 이중화 | `compose.yaml` 은 같고, 달라지는 인자만 `compose/env/<부품>.env` 에 쓴다. Victoria 부품은 `-envflag.enable` 로 환경 변수에서 인자를 읽는다 |
+
+**한 폴더 아래에 모두 둔다.** 기본은 `/cmp-mon` 이고 설치할 때 바꿀 수 있다 (`BASE_DIR`). 컨테이너 이름 앞말과 실행 계정도 같은 이름(`NAME`, 기본 `cmp-mon`)을 따른다.
 
 ```
 /cmp-mon                     기준 폴더 (BASE_DIR)
-├── bin/                     정적 바이너리 (victoria-*, vm*, vl*, vt*, vmauth, alertmanager), reconcile-metrics.sh (주기 대조)
+├── compose/
+│   ├── compose.yaml         부품 전부 (podman-compose 프로젝트 이름 = NAME)
+│   ├── .env                 경로 · 계정 uid · 이미지 버전 · 자기 · 상대 주소
+│   ├── env/                 부품마다 단일/이중화에 따라 달라지는 인자 (vmagent.env 등)
+│   └── reconcile-metrics.sh 주기 대조 (vmctl 컨테이너가 읽는다)
 ├── conf/
-│   ├── env                  노드마다 다른 값 (자기 · 상대 주소, 단일/이중화, 인자)
 │   ├── install.env          지울 때 쓰는 설치 정보
 │   ├── gateway.yml          vmauth 경로 · 토큰 (root 와 서비스 계정만 읽음)
 │   ├── scrape.yml           노드 자체 감시
@@ -537,31 +551,32 @@
 │   ├── vlagent-queue/
 │   ├── vtagent-queue/
 │   └── alertmanager/
-└── logs/                    서비스마다 로그 파일 하나 (logrotate 로 7일)
+└── logs/                    컨테이너마다 로그 파일 하나
 ```
 
 | 항목 | 기본 | 바꾸는 법 |
 |---|---|---|
 | 기준 폴더 | `/cmp-mon` | `BASE_DIR` |
-| 서비스 이름 | `cmp-mon-vmagent` 등 | `NAME` |
-| 실행 계정 | `cmp-mon` | `SERVICE_USER`. **이미 있는 계정이면 만들지 않고 그대로 쓴다.** 지울 때도 우리가 만든 계정만 지운다 |
+| 컨테이너 이름 | `cmp-mon-vmagent` 등 | `NAME` |
+| 실행 계정 | `cmp-mon` | `SERVICE_USER`. **이미 있는 계정이면 만들지 않고 그대로 쓴다.** 지울 때(`--purge`)도 우리가 만든 계정만 지운다 |
 
-폴더 밖에 두는 것은 systemd 유닛(`/etc/systemd/system/cmp-mon-*.service`, 주기 대조 `cmp-mon-reconcile.timer`), logrotate 설정(`/etc/logrotate.d/cmp-mon`), SELinux 라벨 모듈(8.3) 셋뿐이다.
+폴더 밖에 두는 것은 Podman 패키지(RPM), `/usr/local` 의 podman-compose, 컨테이너 이미지 · 컨테이너(podman 저장소 `/var/lib/containers`), `podman-restart.service` 켜기뿐이다. 지우기는 기본으로 데이터를 남기고, `--purge` 를 주면 데이터 · 이미지 · 계정까지 지운다. Podman 패키지는 다른 것도 쓸 수 있어 지우지 않는다.
 
 ### 5.6 단일 노드 · 이중화 전환
 
-같은 설치물로 단일 노드와 이중화를 모두 만든다. 차이는 상대 노드 주소가 있는지 하나다.
+같은 설치물(같은 `compose.yaml` · 같은 이미지)로 단일 노드와 이중화를 모두 만든다. 차이는 상대 노드 주소가 있는지 하나고, 설치 스크립트가 그에 따라 `compose/env/<부품>.env` 와 gateway.yml 만 다르게 쓴다.
 
 | | 단일 노드 | 이중화 |
 |---|---|---|
-| 중계 목적지 | 로컬 저장소 하나 | 로컬 + 상대 노드 |
+| 중계 목적지 (`remoteWrite_url`) | 로컬 저장소 하나 | 로컬 + 상대 노드 |
 | vmauth 경로 | 수집 · 조회만 | 수집 · 조회 · 노드 사이 |
 | Alertmanager | 클러스터 없음 | 두 대 클러스터 |
+| 주기 대조 컨테이너 | 띄우지 않음 | 띄움 (compose 프로필 `ha`) |
 | 바깥 포트 | 4318 · 8443 | 4318 · 8443 · 7443 · 9094 |
 
 - **단일 → 이중화**: 상대 노드를 정해 두 노드에 다시 설치한다. 새 노드에는 그 시점부터 데이터가 쌓인다. 과거 메트릭은 `vmctl` 로 기존 노드에서 복사한다(`poc/bin/backfill-metrics.sh`). 로그 · 트레이스의 과거 데이터 복사는 아직 정하지 않았다. 다 채울 때까지 새 노드에는 조회를 보내지 않는다.
-- **이중화 → 단일**: 상대 노드 없이 남길 노드에 다시 설치한다. 상대 노드로 보내던 큐(`2_` 로 시작)는 지운다. 빠지는 노드는 지우기 스크립트로 정리한다.
-- PoC 에서 이중화 → 단일 전환을 해 봤다 (11.1).
+- **이중화 → 단일**: 상대 노드 없이 남길 노드에 다시 설치한다. 설치가 컨테이너를 모두 내렸다가 다시 만들고, 그 사이 상대 노드로 보내던 큐(`2_` 로 시작)를 지운다. 빠지는 노드는 지우기 스크립트로 정리한다.
+- PoC 에서 이중화 → 단일 전환을 해 봤다 (11.1, systemd 설치 때).
 
 ---
 
@@ -608,7 +623,7 @@
 
 ### 7.2 주기 대조 (메트릭은 PoC 에 만듦, 로그 · 트레이스는 아직)
 
-큐가 못 채운 한쪽 빈틈(7.1)과 큐 한도를 넘은 구간을 사람 대신 메우는 작업이다. 노드마다 타이머로 5분마다 돌고, 15분 전부터 2분 전까지를 본다 (`poc/central/reconcile-metrics.sh`, `cmp-mon-reconcile.timer`). 두 노드가 각자 돌리므로 어느 쪽이 빠졌든 빠진 쪽이 채운다.
+큐가 못 채운 한쪽 빈틈(7.1)과 큐 한도를 넘은 구간을 사람 대신 메우는 작업이다. 노드마다 주기 대조 컨테이너(`cmp-mon-reconcile`, 공식 vmctl 이미지)가 5분마다 돌고, 15분 전부터 2분 전까지를 본다 (`poc/central/reconcile-metrics.sh`). 이 이미지는 Alpine 이라 bash · curl 이 없어 스크립트를 POSIX sh 와 busybox wget(HTTPS 는 OpenSSL 로 인증서 검증)으로 쓴다. 두 노드가 각자 돌리므로 어느 쪽이 빠졌든 빠진 쪽이 채운다.
 
 | 단계 | 메트릭 | 로그 · 트레이스 |
 |---|---|---|
@@ -683,11 +698,12 @@
 - **처음 나오는 말**: SELinux 는 파일과 프로세스에 라벨(type)을 붙이고 라벨끼리 무엇을 허용할지 정책으로 정한다. `bin_t` 는 실행 파일 라벨, `unconfined_service_t` 는 정책 제약을 거의 받지 않는 서비스 도메인이다.
 - 실행 파일을 `bin_t` 로 라벨링하면 systemd 가 그 서비스를 `unconfined_service_t` 로 띄운다 (Red Hat 의 Dan Walsh 설명, RHEL 7 SELinux 가이드). 그러면 로그 읽기 · 벤더 CLI 실행이 정책에 막히지 않는다. **실제로 AVC(거부 기록)가 0건인지는 PoC 에서 `ausearch -m avc` 로 본다.**
 - 라벨은 `chcon` 으로 붙이지 않는다. `chcon` 은 전체 재라벨링(`restorecon -R`, `/.autorelabel`) 때 정책 기본값으로 돌아간다.
-- `semanage` 도 쓰지 않는다. `semanage` 는 `policycoreutils-python-utils` 패키지에 있어 **없는 서버가 있다.** 대신 라벨 규칙을 담은 작은 **CIL 정책 모듈**을 만들어, SELinux 를 쓰면 늘 있는 `semodule` 로 넣는다. 재라벨링해도 유지되고, 지울 때 `semodule -r` 로 뺀다. 설치 폴더(5.5)의 하위 폴더마다 라벨을 준다: `bin` 은 `bin_t`, `conf` 는 `etc_t`, `data` 는 `var_lib_t`, `logs` 는 `var_log_t`.
+- `semanage` 도 쓰지 않는다. `semanage` 는 `policycoreutils-python-utils` 패키지에 있어 **없는 서버가 있다.** 대신 라벨 규칙을 담은 작은 **CIL 정책 모듈**을 만들어, SELinux 를 쓰면 늘 있는 `semodule` 로 넣는다. 재라벨링해도 유지되고, 지울 때 `semodule -r` 로 뺀다. 설치 폴더의 하위 폴더마다 라벨을 준다: `bin` 은 `bin_t`, `conf` 는 `etc_t`, `data` 는 `var_lib_t`, `logs` 는 `var_log_t`. (중앙 노드도 처음에는 이 방식이었다가 컨테이너로 바꾸며 뺐다. 아래 "중앙 노드")
 - 정책 기본값만으로 되는 위치도 있다. `/opt/<이름>/bin` 은 기본 정책이 처음부터 `bin_t` 로 잡는다. `/cmp-mon` 같은 위치는 기본값이 `default_t` 라서 모듈이 필요하다.
 - 컨테이너를 안 쓰므로 `container_t` · `/dev/nvidia*` 장치 라벨(`xserver_misc_device_t`) · `:z` 마운트 문제가 생기지 않는다.
 - OBI 는 별도 프로세스로 root 또는 CAP_BPF · PERFMON 등을 준다. 에이전트 본체는 높은 권한이 필요 없다. SELinux 가 BPF 로드를 막는지는 공식 문서에 언급이 없어 PoC 에서 본다.
-- **입구 프록시**: 배포판 HAProxy 는 `haproxy_t` 도메인에 갇혀 `haproxy_connect_any` 없이는 4318 · 7443 을 열지 못했다(PoC). 그래서 입구를 정적 바이너리 vmauth 로 바꿨다(3.10). vmauth 는 다른 부품처럼 `unconfined_service_t` 로 돈다.
+- **입구 프록시**: 배포판 HAProxy 는 `haproxy_t` 도메인에 갇혀 `haproxy_connect_any` 없이는 4318 · 7443 을 열지 못했다(PoC). 그래서 입구를 vmauth 로 바꿨다(3.10). vmauth 는 다른 중앙 부품처럼 컨테이너로 돈다.
+- **중앙 노드**: 에이전트와 달리 중앙 노드는 컨테이너다(5.5). GPU 장치를 넘길 일이 없어 위의 컨테이너 문제가 없다. container-selinux 정책 아래 프로세스는 `container_t`, bind mount 하는 `conf` · `data` 는 podman 이 `:z` 로 `container_file_t` 라벨을 붙인다. 그래서 중앙 노드에는 CIL 모듈이 필요 없다. host 네트워크로 4318 · 8443 · 7443 · 9094 를 여는 데 불리언이 필요 없었다 (PoC 에서 AVC 0건).
 
 ### 8.4 vSphere 수집
 
@@ -768,7 +784,9 @@
 
 **구성**: 중앙 노드 2대(Rocky Linux 10, SELinux enforcing, 8 vCPU · 16GB · 80GB), 에이전트 시험 VM(Debian 12 + NVIDIA T4 vGPU). Windows · AMD · NPU 서버는 확보되면 더한다. 판정 노드는 필요 없다. Prometheus 1대(9.2 시험용).
 
-**PoC 구성물은 `poc/` 에 둔다.** 노드별 설치 스크립트, 설정 파일, OCB 빌드 설정, 시험 절차가 들어간다. 접속 주소 같은 환경 값은 저장소에 넣지 않는다.
+**PoC 구성물은 `poc/` 에 둔다.** 중앙 노드 compose 파일과 설치 스크립트, 설정 파일, OCB 빌드 설정, 시험 절차가 들어간다. 접속 주소 같은 환경 값은 저장소에 넣지 않는다.
+
+**중앙 노드는 컨테이너로 띄운다** (Podman 5.8 + podman-compose 1.5, 공식 이미지, 5.5). 노드에 DNS 가 없어 Podman RPM(EL10) · podman-compose wheel · 이미지 tar 를 로컬에서 받아 SSH 로 올리고, 노드에서 저장소를 모두 끈 채 설치한다. 처음 PoC 는 systemd + 정적 바이너리로 설치했고(11.1 의 2026-11-01 ~ 02 오전 결과), 같은 날 compose 로 바꿔 같은 시험을 다시 돌렸다.
 
 **성공 기준**
 
@@ -801,12 +819,21 @@
 | 시험 3: 노드 사이 통신 차단 | 노드 A 에서 B 로 가는 경로를 3분 막자(`ip route blackhole`) 각자 받으면서 A 큐 449,443 · B 큐 469,701 바이트가 쌓였다. 풀린 뒤 두 노드 모두 5초 안에 큐 0, 8분 구간 샘플 수 272,221 · ALERTS 16 으로 같음 | `checks/failover-suite.sh 3` |
 | 갑작스런 종료 | 중계 `kill -9` 두 번, 노드 B 강제 재시작 한 번. 잃은 양과 위치는 7.1 | `checks/crash-test.sh relay` · `node` |
 | 이중화 → 단일 전환 | 노드 A 를 단일로 다시 설치: 상대 노드 몫 큐 3개 삭제, 바깥 포트 4318 · 8443 만, 서비스 정상 | 설치 출력, 점검 |
-| SELinux | Enforcing 에서 모든 부품(vmauth 포함)이 `unconfined_service_t`, AVC 0건. 라벨은 CIL 모듈로. 배포판 HAProxy 는 `haproxy_connect_any` 없이 시작 못 함 | `ps -eZ`, `ausearch -m avc` |
+| SELinux (systemd 설치 때) | Enforcing 에서 모든 부품(vmauth 포함)이 `unconfined_service_t`, AVC 0건. 라벨은 CIL 모듈로. 배포판 HAProxy 는 `haproxy_connect_any` 없이 시작 못 함. **다시 확인 필요**: compose 전환 때 `central-health.sh` 의 AVC 조회가 표준 입력(넘겨준 스크립트)을 로그로 읽어 늘 0건으로 나오던 것을 찾아 고쳤다 (`ausearch --input-logs`). 이 줄의 0건이 그 점검으로 본 것이면 근거가 안 된다 | `ps -eZ`, `ausearch -m avc` |
 | 에이전트 전환 · 복귀 (입구 정지) | 노드 A 에 띄운 `cmp-otelcol`(시작 주소 B). 노드 B 입구를 90초 멈추자 약 5초 뒤 A 로 넘어갔고, 다시 켠 뒤 `failback_interval`(시험값 1분)에 B 로 돌아왔다. 1초 간격 메트릭이 303초 구간에서 두 저장소 모두 303 개 (빠짐 0) | `checks/agent-failover.sh stop` |
 | 에이전트 전환 · 복귀 (응답 없음) | 에이전트 호스트에서 노드 B 로 가는 길을 90초 막자(blackhole) 요청 시간 초과 5초 뒤 A 로 넘어갔고, 풀린 뒤 B 로 돌아왔다. 304초 구간에서 두 저장소 모두 304 개 (빠짐 0) | `checks/agent-failover.sh cut` |
 | 에이전트 평상시 | 시작 주소 B 로만 보냈다 (20초 동안 B 중계 +486 행, A 중계 +0) | 같은 스크립트 |
 | 주기 대조 | 노드 B 저장소 `kill -9` 로 생긴 6,195 샘플 빈틈을 한 번에 메움 (7.2) | `checks/reconcile-test.sh` |
 | 과거 메트릭 채우기 | `bin/backfill-metrics.sh` 를 HTTPS · 노드 사이 토큰으로 고쳐 1분 구간 복사 확인 | 실행 출력 |
+| compose 전환 (11-02) | 두 노드의 systemd 설치(유닛 9개 · 대조 타이머 · CIL 모듈 · `/cmp-mon/bin`)를 걷어내고 compose 로 다시 설치. `/cmp-mon/data` 는 그대로 이어 썼다 (서비스 계정 uid 991 로 컨테이너 실행). 두 노드 모두 컨테이너 10개 Up, 로컬 부품 `/health` 200 | `poc/checks/central-health.sh` |
+| 바깥 포트 · 토큰 (compose) | 노드 IP 에서 4318 · 7443 · 8443 · 9094(TCP · UDP) 만 듣는다 (SSH, 원래 있던 cockpit 9090 제외). 조회 토큰 200, 토큰 없이 401, 노드 사이 토큰 200, 조회 토큰으로 노드 사이 경로 400 | 위 출력, `ss -ltn` |
+| SELinux (compose) | 부품은 모두 `container_t`, `conmon` 은 `container_runtime_t`, `conf` · `data` 는 `container_file_t`(`:z`). 노드 A 는 그날(UTC 0시부터) AVC 0건 (`ausearch --input-logs`). `restorecon -R` 은 라벨을 바꾸지 않는다(`container_file_t` 는 customizable type). `restorecon -RF` 로 강제로 되돌리자 그 사이 쓰기가 막혀 노드 B 에 AVC 10건, 컨테이너를 다시 띄우자 podman 이 라벨을 다시 붙였고 그 뒤 0건 | `ls -Z`, `ausearch -m avc` |
+| 다시 띄우기 (compose) | `podman restart` 로 전부 다시 띄워 모두 Up · `/health` 200. 모두 멈춘 뒤 `podman-restart.service` 만 다시 돌리자 모두 Up (부팅 때 하는 일, 노드 재부팅은 안 함) | 실행 출력 |
+| 시험 4 (compose) | 노드 A 의 vmagent 컨테이너를 멈춘 100초 동안 B 의 vmagent 가 remote_write 로 받은 행 4 → 18. 다시 켠 뒤 5분 구간 샘플 수 169,353 · ALERTS 10 으로 같음 | `checks/failover-suite.sh 4` |
+| 시험 2 (compose) | 노드 B 컨테이너를 모두 3분 멈춘 동안 A 조회 200, A 의 B 몫 큐 1,192,437 바이트. 켜자 5초 안에 큐 0, 8분 구간 213,980 · ALERTS 16 으로 같음 | `checks/failover-suite.sh 2` |
+| 시험 3 (compose) | 3분 차단 중 A 큐 624,734 · B 큐 484,458 바이트. 풀린 뒤 A 30초 · B 5초 안에 큐 0, 8분 구간 283,273 · ALERTS 16 으로 같음 | `checks/failover-suite.sh 3` |
+| 주기 대조 (compose) | 노드 B 의 VictoriaMetrics 컨테이너 프로세스를 `kill -9` 하자 3분 구간 A 127,143 · B 123,490 (차 3,653). 대조 컨테이너에서 한 번 돌리자 빠진 1분만 복사(0.63초)해 둘 다 127,143 | `checks/reconcile-test.sh` |
+| 중계 `kill -9` (compose) | 노드 A 의 vmagent 컨테이너 프로세스를 `kill -9` 하자 받았다고 응답한 18,100 샘플 중 A · B 모두 18,000 (1초치 100 개를 양쪽에서 잃음). systemd 때와 같은 결과다 (7.1). 노드 강제 재시작 · 실제 재부팅은 compose 에서 아직 안 함 | `checks/crash-test.sh relay` |
 | 시험 5 · 6, 에이전트를 .73(GPU) 에서, 노드 강제 재시작 중 에이전트 전환, 로그 · 트레이스 주기 대조 | 아직 안 함 | |
 
 ## 12. 도입 순서

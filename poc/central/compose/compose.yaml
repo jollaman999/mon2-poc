@@ -1,0 +1,174 @@
+# 중앙 노드 하나의 부품 전부. install.sh 가 BASE_DIR/compose/ 에 이 파일 · .env · env/*.env 를 두고 podman-compose 로 띄운다.
+# 인자는 systemd 설치 때 유닛의 ExecStart 와 같다.
+#
+# - 모두 network_mode: host. 듣는 주소는 그대로다 (바깥은 vmauth 4318 · 8443 · 7443, Alertmanager 9094).
+# - 컨테이너는 서비스 계정(SVC_UID:SVC_GID)으로 돈다. BASE_DIR 아래 파일 소유와 맞춘다.
+# - 설정 · 데이터는 호스트와 같은 경로로 bind mount 한다. SELinux 라벨은 :z (공유 라벨 container_file_t:s0).
+#   :Z 는 컨테이너를 새로 만들 때마다 다른 MCS 라벨을 붙여 데이터 전체를 다시 라벨링하므로 쓰지 않는다.
+# - 로그는 podman 이 BASE_DIR/logs/<부품>.log 에 쓴다 (k8s-file, 50MB 가 넘으면 비우고 다시 쓴다).
+# - 단일 · 이중화에 따라 달라지는 인자는 install.sh 가 env/<부품>.env 에 쓴다.
+#   Victoria 부품은 -envflag.enable 로 환경 변수에서 인자를 읽는다 (인자 이름의 . 을 _ 로, 배열은 쉼표로).
+#   명령줄에 같은 인자가 있으면 명령줄이 이기므로, 달라지는 인자는 명령줄에 두지 않는다.
+#   vlagent · vtagent 이미지에는 셸이 없어 sh 로 인자를 나눌 수 없고, podman-compose 는 command 를 나눈 뒤에
+#   변수를 넣어서 변수 하나에 든 인자 여러 개를 나누지 못한다. 그래서 이 방법을 쓴다.
+#   Alertmanager 는 환경 변수 인자가 없어 이미지의 sh 로 AM_CLUSTER_ARGS 를 나눈다.
+x-podman:
+  in_pod: false
+
+x-common: &common
+  network_mode: host
+  restart: always
+  user: "${SVC_UID}:${SVC_GID}"
+  ulimits:
+    nofile: 1048576
+
+services:
+  victoria-metrics:
+    <<: *common
+    image: docker.io/victoriametrics/victoria-metrics:${VM_VERSION}
+    container_name: ${NAME}-victoria-metrics
+    command:
+      - -httpListenAddr=127.0.0.1:8428
+      - -storageDataPath=${BASE_DIR}/data/victoria-metrics
+      - -retentionPeriod=${RETENTION}
+      - -dedup.minScrapeInterval=1ms
+      - -opentelemetry.usePrometheusNaming
+    volumes:
+      - ${BASE_DIR}/data/victoria-metrics:${BASE_DIR}/data/victoria-metrics:z
+    logging: {driver: k8s-file, options: {path: "${BASE_DIR}/logs/victoria-metrics.log", max-size: 50m}}
+
+  victoria-logs:
+    <<: *common
+    image: docker.io/victoriametrics/victoria-logs:${VL_VERSION}
+    container_name: ${NAME}-victoria-logs
+    command:
+      - -httpListenAddr=127.0.0.1:9428
+      - -storageDataPath=${BASE_DIR}/data/victoria-logs
+      - -retentionPeriod=${RETENTION}
+    volumes:
+      - ${BASE_DIR}/data/victoria-logs:${BASE_DIR}/data/victoria-logs:z
+    logging: {driver: k8s-file, options: {path: "${BASE_DIR}/logs/victoria-logs.log", max-size: 50m}}
+
+  victoria-traces:
+    <<: *common
+    image: docker.io/victoriametrics/victoria-traces:${VT_VERSION}
+    container_name: ${NAME}-victoria-traces
+    command:
+      - -httpListenAddr=127.0.0.1:10428
+      - -storageDataPath=${BASE_DIR}/data/victoria-traces
+      - -retentionPeriod=${RETENTION}
+    volumes:
+      - ${BASE_DIR}/data/victoria-traces:${BASE_DIR}/data/victoria-traces:z
+    logging: {driver: k8s-file, options: {path: "${BASE_DIR}/logs/victoria-traces.log", max-size: 50m}}
+
+  # 중계 3종: 목적지(remoteWrite.url, env)는 1 = 로컬 저장소(http), 2 = 상대 노드 :7443 (이중화일 때만)
+  vmagent:
+    <<: *common
+    image: docker.io/victoriametrics/vmagent:${VM_VERSION}
+    container_name: ${NAME}-vmagent
+    env_file: env/vmagent.env
+    command:
+      - -envflag.enable
+      - -httpListenAddr=127.0.0.1:8429
+      - -remoteWrite.tmpDataPath=${BASE_DIR}/data/vmagent-queue
+      - -remoteWrite.maxDiskUsagePerURL=${QUEUE_MAX}
+      - -opentelemetry.usePrometheusNaming
+      - -promscrape.config=${BASE_DIR}/conf/scrape.yml
+    volumes:
+      - ${BASE_DIR}/conf:${BASE_DIR}/conf:ro,z
+      - ${BASE_DIR}/data/vmagent-queue:${BASE_DIR}/data/vmagent-queue:z
+    logging: {driver: k8s-file, options: {path: "${BASE_DIR}/logs/vmagent.log", max-size: 50m}}
+
+  vlagent:
+    <<: *common
+    image: docker.io/victoriametrics/vlagent:${VL_VERSION}
+    container_name: ${NAME}-vlagent
+    env_file: env/vlagent.env
+    command:
+      - -envflag.enable
+      - -httpListenAddr=127.0.0.1:9429
+      - -remoteWrite.tmpDataPath=${BASE_DIR}/data/vlagent-queue
+      - -remoteWrite.maxDiskUsagePerURL=${QUEUE_MAX}
+    volumes:
+      - ${BASE_DIR}/conf:${BASE_DIR}/conf:ro,z
+      - ${BASE_DIR}/data/vlagent-queue:${BASE_DIR}/data/vlagent-queue:z
+    logging: {driver: k8s-file, options: {path: "${BASE_DIR}/logs/vlagent.log", max-size: 50m}}
+
+  vtagent:
+    <<: *common
+    image: docker.io/victoriametrics/vtagent:${VT_VERSION}
+    container_name: ${NAME}-vtagent
+    env_file: env/vtagent.env
+    command:
+      - -envflag.enable
+      - -httpListenAddr=127.0.0.1:10429
+      - -remoteWrite.tmpDataPath=${BASE_DIR}/data/vtagent-queue
+      - -remoteWrite.maxDiskUsagePerURL=${QUEUE_MAX}
+    volumes:
+      - ${BASE_DIR}/conf:${BASE_DIR}/conf:ro,z
+      - ${BASE_DIR}/data/vtagent-queue:${BASE_DIR}/data/vtagent-queue:z
+    logging: {driver: k8s-file, options: {path: "${BASE_DIR}/logs/vtagent.log", max-size: 50m}}
+
+  # 알림 보낼 곳(notifier.url)은 1 = 로컬 Alertmanager, 2 = 상대 노드 :7443/am (이중화일 때만). TLS 검증 방식도 env 에
+  vmalert:
+    <<: *common
+    image: docker.io/victoriametrics/vmalert:${VM_VERSION}
+    container_name: ${NAME}-vmalert
+    env_file: env/vmalert.env
+    command:
+      - -envflag.enable
+      - -httpListenAddr=127.0.0.1:8880
+      - -datasource.url=https://${SELF}:8443/metrics
+      - -datasource.bearerTokenFile=${BASE_DIR}/conf/tokens/query.token
+      - -remoteRead.url=https://${SELF}:8443/metrics
+      - -remoteRead.bearerTokenFile=${BASE_DIR}/conf/tokens/query.token
+      - -remoteWrite.url=https://${SELF}:4318
+      - -rule=${BASE_DIR}/conf/rules/*.yml
+    volumes:
+      - ${BASE_DIR}/conf:${BASE_DIR}/conf:ro,z
+    logging: {driver: k8s-file, options: {path: "${BASE_DIR}/logs/vmalert.log", max-size: 50m}}
+
+  alertmanager:
+    <<: *common
+    image: docker.io/prom/alertmanager:v${AM_VERSION}
+    container_name: ${NAME}-alertmanager
+    env_file: env/alertmanager.env
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        exec /bin/alertmanager --config.file=${BASE_DIR}/conf/alertmanager.yml
+        --storage.path=${BASE_DIR}/data/alertmanager --web.listen-address=127.0.0.1:9093 $$AM_CLUSTER_ARGS
+    volumes:
+      - ${BASE_DIR}/conf:${BASE_DIR}/conf:ro,z
+      - ${BASE_DIR}/data/alertmanager:${BASE_DIR}/data/alertmanager:z
+    logging: {driver: k8s-file, options: {path: "${BASE_DIR}/logs/alertmanager.log", max-size: 50m}}
+
+  # 입구 vmauth. 바깥 포트는 프록시만 받고, 자체 지표 · 재적재 주소는 127.0.0.1:8427 로 뺀다
+  # env: 듣는 주소 · TLS 인증서 · 상대 노드 인증서 검증 방식
+  gateway:
+    <<: *common
+    image: docker.io/victoriametrics/vmauth:${VM_VERSION}
+    container_name: ${NAME}-gateway
+    env_file: env/gateway.env
+    command:
+      - -envflag.enable
+      - -auth.config=${BASE_DIR}/conf/gateway.yml
+      - -httpInternalListenAddr=127.0.0.1:8427
+      - -loadBalancingPolicy=first_available
+    volumes:
+      - ${BASE_DIR}/conf:${BASE_DIR}/conf:ro,z
+    logging: {driver: k8s-file, options: {path: "${BASE_DIR}/logs/gateway.log", max-size: 50m}}
+
+  # 주기 대조 (이중화일 때만, --profile ha). 공식 vmctl 이미지에서 RECONCILE_EVERY 초마다 돈다
+  reconcile:
+    <<: *common
+    image: docker.io/victoriametrics/vmctl:${VM_VERSION}
+    container_name: ${NAME}-reconcile
+    profiles: [ha]
+    env_file: .env
+    entrypoint: [/bin/sh, /reconcile-metrics.sh, loop]
+    volumes:
+      - ${BASE_DIR}/conf:${BASE_DIR}/conf:ro,z
+      - ${BASE_DIR}/compose/reconcile-metrics.sh:/reconcile-metrics.sh:ro,z
+    logging: {driver: k8s-file, options: {path: "${BASE_DIR}/logs/reconcile.log", max-size: 50m}}
