@@ -14,9 +14,16 @@ case "$src" in A) from=$NODE_A; to=$NODE_B ;; B) from=$NODE_B; to=$NODE_A ;; *) 
 [ -n "${NODE_B:-}" ] || { echo "이중화 상태가 아니다 (NODE_B 비어 있음)" >&2; exit 1; }
 ssh_opts=(-n -i "$SSH_KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new)
 [ -n "${JUMP:-}" ] && ssh_opts+=(-J "$JUMP")
-timeout 3600 ssh "${ssh_opts[@]}" "$SSH_USER@$to" \
-  "$BIN_DIR/vmctl-prod vm-native -s \
-     --vm-native-src-addr=http://$from:7443/vm \
-     --vm-native-dst-addr=http://127.0.0.1:8428 \
-     --vm-native-filter-match='{__name__!=\"\"}' \
-     --vm-native-filter-time-start=$start --vm-native-filter-time-end=$end"
+# 원본 노드의 :7443/vm 은 HTTPS 이고 노드 사이 토큰이 있어야 연다. 토큰은 대상 노드에 이미 있는 것을 쓴다
+CONF_DIR=${BASE_DIR:-/$NAME}/conf
+case "${TLS_VERIFY:-skip}" in skip) tls=--vm-native-src-insecure-skip-verify ;; *) tls=--vm-native-src-ca-file=$CONF_DIR/tls/ca.pem ;; esac
+# 원격 명령은 표준 입력으로 넘긴다 (따옴표가 겹쳐 깨지지 않게). 그래서 이 줄만 ssh 에 -n 을 주지 않는다
+ssh_in=(); for o in "${ssh_opts[@]}"; do [ "$o" = -n ] || ssh_in+=("$o"); done
+timeout 3600 ssh "${ssh_in[@]}" "$SSH_USER@$to" "sudo bash -s" <<REMOTE
+"$BIN_DIR/vmctl-prod" vm-native -s \
+  --vm-native-src-addr="https://$from:7443/vm" \
+  --vm-native-src-bearer-token="\$(cat $CONF_DIR/tokens/peer.token)" $tls \
+  --vm-native-dst-addr=http://127.0.0.1:8428 \
+  --vm-native-filter-match='{__name__=~".+"}' \
+  --vm-native-filter-time-start="$start" --vm-native-filter-time-end="$end"
+REMOTE
