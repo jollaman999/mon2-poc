@@ -1,0 +1,33 @@
+package top10
+
+import (
+	"context"
+
+	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/consumer"
+	"go.opentelemetry.io/collector/processor"
+	"go.opentelemetry.io/collector/processor/processorhelper"
+)
+
+const typeStr = "top10"
+
+func NewFactory() processor.Factory {
+	return processor.NewFactory(
+		component.MustNewType(typeStr),
+		createDefaultConfig,
+		processor.WithMetrics(createMetrics, component.StabilityLevelDevelopment),
+	)
+}
+
+func createDefaultConfig() component.Config {
+	return &Config{
+		TopN: 10,
+		By:   []string{ByCPU, ByMemory},
+	}
+}
+
+func createMetrics(ctx context.Context, set processor.Settings, cfg component.Config, next consumer.Metrics) (processor.Metrics, error) {
+	p := newProcessor(cfg.(*Config))
+	return processorhelper.NewMetrics(ctx, set, cfg, next, p.processMetrics,
+		processorhelper.WithCapabilities(consumer.Capabilities{MutatesData: true}))
+}
