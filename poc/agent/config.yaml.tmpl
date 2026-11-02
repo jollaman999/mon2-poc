@@ -1,7 +1,7 @@
-# cmp-otelcol PoC 설정. run-poc.sh 가 @...@ 를 채운다.
+# cmp-otelcol 설정 틀. install.sh(Linux) · windows/install.ps1 이 @...@ 를 채워 conf/config.yaml 로 쓴다.
 extensions:
   file_storage:
-    directory: @QUEUE_DIR@
+    directory: "@QUEUE_DIR@"
     create_directory: true
 
 receivers:
@@ -34,7 +34,7 @@ exporters:
     failback_interval: @FAILBACK@
     timeout: 5s
     tls:
-      insecure_skip_verify: true       # 사설 인증서 (TLS_VERIFY=skip)
+      @TLS@                            # TLS_VERIFY=skip 이면 검증 안 함, ca 면 사설 CA 로 검증
     sending_queue:
       storage: file_storage
     retry_on_failure:
@@ -46,6 +46,8 @@ service:
   telemetry:
     logs:
       level: info
+      output_paths: ["@LOG_FILE@"]
+      error_output_paths: ["@LOG_FILE@"]
   pipelines:
     metrics:
       receivers: [hostmetrics, otlp]

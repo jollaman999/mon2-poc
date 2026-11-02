@@ -1,4 +1,4 @@
-# OCB(OpenTelemetry Collector Builder) 부품 목록. build.sh 가 쓴다.
+# OCB(OpenTelemetry Collector Builder) 부품 목록. poc/Makefile 의 make agent 가 쓴다.
 dist:
   name: cmp-otelcol
   description: cmp-mon 에이전트 (PoC)

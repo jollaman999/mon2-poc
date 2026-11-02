@@ -1,0 +1,17 @@
+[Unit]
+Description=cmp-otelcol 에이전트 (호스트 지표 · 로그 · 트레이스를 중앙 노드로 보낸다)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=root
+Group=root
+ExecStart=/cmp-agent/bin/cmp-otelcol --config /cmp-agent/conf/config.yaml
+Restart=always
+RestartSec=3
+LimitNOFILE=65536
+# 에이전트 로그는 설정의 output_paths 로 /cmp-agent/logs/cmp-otelcol.log 에 쓴다.
+# 설정을 읽기 전에 죽은 경우의 출력은 저널에 남는다 (journalctl -u cmp-otelcol)
+
+[Install]
+WantedBy=multi-user.target
