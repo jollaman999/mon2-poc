@@ -1,0 +1,8 @@
+Nov  2 10:15:01 gpu01 kernel: [ 8812.123456] NVRM: Xid (PCI:0000:3b:00): 79, pid='<unknown>', name=<unknown>, GPU has fallen off the bus.
+Nov  2 10:15:02 gpu01 kernel: NVRM: Xid (PCI:0000:3B:00): 13, pid=4242, name=python3, Graphics SM Warp Exception on (GPC 0, TPC 0, SM 0): Out Of Range Address
+NVRM: Xid (PCI:0000:5e:00): 31, pid=5151, name=train, Ch 00000008, intr 10000000. MMU Fault: ENGINE GRAPHICS GPCCLIENT_T1_0 faulted @ 0x7f2a_1c000000. Fault is of type FAULT_PDE ACCESS_TYPE_VIRT_READ
+NVRM: Xid (0000:86:00): 48, An uncorrectable double bit error (DBE) has been detected on GPU in the framebuffer at partition 6, subpartition 0.
+NVRM: Xid (PCI:00000001:02:00.0): 94, pid=777, name=app, Contained ECC error.
+nvidia-nvswitch0: SXid (PCI:0000:05:00.0): 12028, Non-fatal, Link 32 egress non-posted PRIV error
+NVRM: GPU at PCI:0000:3b:00: GPU-00000000-0000-4000-8000-000000000001
+kernel: e1000e: eth0 NIC Link is Up 1000 Mbps Full Duplex
