@@ -1,4 +1,4 @@
-package top10
+package top10process
 
 import (
 	"context"
@@ -33,17 +33,17 @@ type candidate struct {
 	mem float64
 }
 
-type top10Processor struct {
+type top10processProcessor struct {
 	cfg  *Config
 	mu   sync.Mutex
 	last map[procKey]cpuSample
 }
 
-func newProcessor(cfg *Config) *top10Processor {
-	return &top10Processor{cfg: cfg, last: make(map[procKey]cpuSample)}
+func newProcessor(cfg *Config) *top10processProcessor {
+	return &top10processProcessor{cfg: cfg, last: make(map[procKey]cpuSample)}
 }
 
-func (p *top10Processor) processMetrics(_ context.Context, md pmetric.Metrics) (pmetric.Metrics, error) {
+func (p *top10processProcessor) processMetrics(_ context.Context, md pmetric.Metrics) (pmetric.Metrics, error) {
 	rms := md.ResourceMetrics()
 	isProc := make([]bool, rms.Len())
 	var cands []candidate
@@ -87,7 +87,7 @@ func (p *top10Processor) processMetrics(_ context.Context, md pmetric.Metrics) (
 
 // selectTop 은 기준마다 상위 TopN 개를 골라 합집합을 돌려준다.
 // 값이 같으면 pid 가 작은 쪽을 먼저 둔다.
-func (p *top10Processor) selectTop(cands []candidate, n int) []bool {
+func (p *top10processProcessor) selectTop(cands []candidate, n int) []bool {
 	keep := make([]bool, n)
 	sorted := make([]candidate, len(cands))
 	for _, by := range p.cfg.By {

@@ -1,4 +1,4 @@
-package top10
+package top10process
 
 import (
 	"context"
@@ -75,7 +75,7 @@ func keptPIDs(t *testing.T, md pmetric.Metrics) []int64 {
 	return pids
 }
 
-func run(t *testing.T, p *top10Processor, md pmetric.Metrics) []int64 {
+func run(t *testing.T, p *top10processProcessor, md pmetric.Metrics) []int64 {
 	t.Helper()
 	out, err := p.processMetrics(context.Background(), md)
 	if err != nil {

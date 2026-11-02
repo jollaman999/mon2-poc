@@ -1,8 +1,8 @@
-// top10 은 hostmetrics 의 process 스크레이퍼가 낸 프로세스별 지표에서
+// top10process 는 hostmetrics 의 process 스크레이퍼가 낸 프로세스별 지표에서
 // CPU · 메모리 사용량 상위 N 개 프로세스의 지표만 남기는 프로세서다.
 // 기준이 둘이면 CPU 상위 N 개와 메모리 상위 N 개의 합집합을 남긴다. 나머지는 버린다.
 // process.pid 속성이 없는 resource(cpu · memory 스크레이퍼 등)는 그대로 넘긴다.
-package top10
+package top10process
 
 import (
 	"errors"

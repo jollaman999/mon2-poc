@@ -640,7 +640,7 @@
 | 기능 | 부품 | 종류 | 공식 / 자체 |
 |---|---|---|---|
 | CPU · 메모리 · 디스크 · 네트워크 · 프로세스 | hostmetrics | receiver | 공식 |
-| 프로세스 Top N 만 남기기 | top10 | processor | 자체 (hostmetrics 는 고르기가 없다) |
+| 프로세스 Top N 만 남기기 | top10process | processor | 자체 (hostmetrics 는 고르기가 없다) |
 | 시스템 로그: rsyslog 파일 · journald · Windows 이벤트 로그 중 **있는 것을 자동으로 고르기**, syslog 서버, 데몬 · 컨테이너가 연 로그 파일 자동 발견 | unifiedlog · servicelog | receiver | 자체. 원천 읽기는 공식 journald · filelog · syslog · windowseventlog 부품의 라이브러리를 쓸 수 있는지 PoC 에서 본다 |
 | GPU · NPU | accelerator (NVIDIA nvidia-smi · NVML GPM, AMD amd-smi, Rebellions rbln-smi, Furiosa furiosa-smi-go) | receiver | 자체 |
 | GPU 오류 로그(XID)와 GPU 지표 잇기 | gpujoin | processor 또는 connector | 자체 |

@@ -1,4 +1,4 @@
-package top10
+package top10process
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"go.opentelemetry.io/collector/processor/processorhelper"
 )
 
-const typeStr = "top10"
+const typeStr = "top10process"
 
 func NewFactory() processor.Factory {
 	return processor.NewFactory(

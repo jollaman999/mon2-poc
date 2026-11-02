@@ -11,7 +11,7 @@
 | `unifiedlog` | `plugins/inputs/win_eventlog` 의 Windows 이벤트 로그 읽기 (`eventlog_*.go`). 나머지(unifiedlog · journald · procdiscovery)는 이 저장소 작성자가 Telegraf 포크에서 만든 것 |
 | `vsphere` | `plugins/inputs/vsphere` 의 수집기와 `filter` 패키지 (이벤트 수집은 이 저장소 작성자가 Telegraf 포크에서 만든 것) |
 
-`winpackettrace`, `top10` 은 이 저장소 작성자가 Telegraf 포크에서 만든 코드를 옮긴 것이다.
+`winpackettrace`, `top10process` 는 이 저장소 작성자가 Telegraf 포크에서 만든 코드를 옮긴 것이다.
 
 ```
 The MIT License (MIT)

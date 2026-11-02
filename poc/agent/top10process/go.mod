@@ -1,4 +1,4 @@
-module github.com/jollaman999/mon2-poc/agent/top10
+module github.com/jollaman999/mon2-poc/agent/top10process
 
 go 1.26.0
 
