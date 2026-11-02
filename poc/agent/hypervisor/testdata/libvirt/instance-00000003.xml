@@ -1,0 +1,271 @@
+<domain type='kvm' id='2'>
+  <name>instance-00000003</name>
+  <uuid>10000000-0000-4000-8000-000000000001</uuid>
+  <metadata>
+    <nova:instance xmlns:nova="http://openstack.org/xmlns/libvirt/nova/1.1" xmlns:instance="http://openstack.org/xmlns/libvirt/nova/1.1">
+      <nova:package version="33.0.3"/>
+      <nova:name>vgpu-linux-test-01</nova:name>
+      <nova:creationTime>2026-10-22 08:01:46</nova:creationTime>
+      <nova:flavor name="vgpu-flavor" id="90000000-0000-4000-8000-000000000001">
+        <nova:memory>16384</nova:memory>
+        <nova:disk>100</nova:disk>
+        <nova:swap>0</nova:swap>
+        <nova:ephemeral>0</nova:ephemeral>
+        <nova:vcpus>8</nova:vcpus>
+        <nova:extraSpecs>
+          <nova:extraSpec name="resources:VGPU">1</nova:extraSpec>
+        </nova:extraSpecs>
+      </nova:flavor>
+      <nova:image uuid="">
+        <nova:containerFormat>bare</nova:containerFormat>
+        <nova:diskFormat>qcow2</nova:diskFormat>
+        <nova:minDisk>100</nova:minDisk>
+        <nova:minRam>0</nova:minRam>
+        <nova:properties>
+          <nova:property name="hw_cdrom_bus">ide</nova:property>
+          <nova:property name="hw_disk_bus">virtio</nova:property>
+          <nova:property name="hw_input_bus">usb</nova:property>
+          <nova:property name="hw_machine_type">pc</nova:property>
+          <nova:property name="hw_pointer_model">usbtablet</nova:property>
+          <nova:property name="hw_video_model">virtio</nova:property>
+          <nova:property name="hw_vif_model">virtio</nova:property>
+        </nova:properties>
+      </nova:image>
+      <nova:owner>
+        <nova:user uuid="00000000000000000000000000000001">admin</nova:user>
+        <nova:project uuid="00000000000000000000000000000002">admin</nova:project>
+      </nova:owner>
+      <nova:root type="volume" uuid=""/>
+      <nova:ports>
+        <nova:port uuid="90000000-0000-4000-8000-000000000002">
+          <nova:ip type="fixed" address="192.0.2.1" ipVersion="4"/>
+        </nova:port>
+      </nova:ports>
+    </nova:instance>
+  </metadata>
+  <memory unit='KiB'>16777216</memory>
+  <currentMemory unit='KiB'>16777216</currentMemory>
+  <vcpu placement='static'>8</vcpu>
+  <iothreads>1</iothreads>
+  <resource>
+    <partition>/machine</partition>
+  </resource>
+  <sysinfo type='smbios'>
+    <system>
+      <entry name='manufacturer'>OpenStack Foundation</entry>
+      <entry name='product'>OpenStack Nova</entry>
+      <entry name='version'>33.0.3</entry>
+      <entry name='serial'>10000000-0000-4000-8000-000000000001</entry>
+      <entry name='uuid'>10000000-0000-4000-8000-000000000001</entry>
+      <entry name='family'>Virtual Machine</entry>
+    </system>
+  </sysinfo>
+  <os>
+    <type arch='x86_64' machine='pc-i440fx-noble'>hvm</type>
+    <boot dev='hd'/>
+    <smbios mode='sysinfo'/>
+  </os>
+  <features>
+    <acpi/>
+    <apic/>
+    <vmcoreinfo state='on'/>
+  </features>
+  <cpu mode='custom' match='exact' check='full'>
+    <model fallback='forbid'>SapphireRapids</model>
+    <vendor>Intel</vendor>
+    <topology sockets='8' dies='1' cores='1' threads='1'/>
+    <feature policy='require' name='ds'/>
+    <feature policy='require' name='ss'/>
+    <feature policy='require' name='dtes64'/>
+    <feature policy='require' name='vmx'/>
+    <feature policy='require' name='pdcm'/>
+    <feature policy='require' name='hypervisor'/>
+    <feature policy='require' name='tsc_adjust'/>
+    <feature policy='require' name='waitpkg'/>
+    <feature policy='require' name='cldemote'/>
+    <feature policy='require' name='movdiri'/>
+    <feature policy='require' name='movdir64b'/>
+    <feature policy='require' name='md-clear'/>
+    <feature policy='require' name='stibp'/>
+    <feature policy='require' name='flush-l1d'/>
+    <feature policy='require' name='ibpb'/>
+    <feature policy='require' name='ibrs'/>
+    <feature policy='require' name='amd-stibp'/>
+    <feature policy='require' name='amd-ssbd'/>
+    <feature policy='require' name='tsx-ctrl'/>
+    <feature policy='require' name='sbdr-ssdp-no'/>
+    <feature policy='require' name='fbsdp-no'/>
+    <feature policy='require' name='psdp-no'/>
+    <feature policy='require' name='gds-no'/>
+    <feature policy='require' name='vmx-ins-outs'/>
+    <feature policy='require' name='vmx-true-ctls'/>
+    <feature policy='require' name='vmx-any-errcode'/>
+    <feature policy='require' name='vmx-store-lma'/>
+    <feature policy='require' name='vmx-activity-hlt'/>
+    <feature policy='require' name='vmx-activity-wait-sipi'/>
+    <feature policy='require' name='vmx-vmwrite-vmexit-fields'/>
+    <feature policy='require' name='vmx-apicv-xapic'/>
+    <feature policy='require' name='vmx-ept'/>
+    <feature policy='require' name='vmx-desc-exit'/>
+    <feature policy='require' name='vmx-rdtscp-exit'/>
+    <feature policy='require' name='vmx-apicv-x2apic'/>
+    <feature policy='require' name='vmx-vpid'/>
+    <feature policy='require' name='vmx-wbinvd-exit'/>
+    <feature policy='require' name='vmx-unrestricted-guest'/>
+    <feature policy='require' name='vmx-apicv-register'/>
+    <feature policy='require' name='vmx-apicv-vid'/>
+    <feature policy='require' name='vmx-rdrand-exit'/>
+    <feature policy='require' name='vmx-invpcid-exit'/>
+    <feature policy='require' name='vmx-vmfunc'/>
+    <feature policy='require' name='vmx-shadow-vmcs'/>
+    <feature policy='require' name='vmx-rdseed-exit'/>
+    <feature policy='require' name='vmx-pml'/>
+    <feature policy='require' name='vmx-xsaves'/>
+    <feature policy='require' name='vmx-tsc-scaling'/>
+    <feature policy='require' name='vmx-enable-user-wait-pause'/>
+    <feature policy='require' name='vmx-invvpid'/>
+    <feature policy='require' name='vmx-invvpid-single-addr'/>
+    <feature policy='require' name='vmx-invvpid-all-context'/>
+    <feature policy='require' name='vmx-ept-execonly'/>
+    <feature policy='require' name='vmx-page-walk-4'/>
+    <feature policy='require' name='vmx-page-walk-5'/>
+    <feature policy='require' name='vmx-ept-2mb'/>
+    <feature policy='require' name='vmx-ept-1gb'/>
+    <feature policy='require' name='vmx-invept'/>
+    <feature policy='require' name='vmx-eptad'/>
+    <feature policy='require' name='vmx-invept-single-context'/>
+    <feature policy='require' name='vmx-invept-all-context'/>
+    <feature policy='require' name='vmx-intr-exit'/>
+    <feature policy='require' name='vmx-nmi-exit'/>
+    <feature policy='require' name='vmx-vnmi'/>
+    <feature policy='require' name='vmx-preemption-timer'/>
+    <feature policy='require' name='vmx-posted-intr'/>
+    <feature policy='require' name='vmx-vintr-pending'/>
+    <feature policy='require' name='vmx-tsc-offset'/>
+    <feature policy='require' name='vmx-hlt-exit'/>
+    <feature policy='require' name='vmx-invlpg-exit'/>
+    <feature policy='require' name='vmx-mwait-exit'/>
+    <feature policy='require' name='vmx-rdpmc-exit'/>
+    <feature policy='require' name='vmx-rdtsc-exit'/>
+    <feature policy='require' name='vmx-cr3-load-noexit'/>
+    <feature policy='require' name='vmx-cr3-store-noexit'/>
+    <feature policy='require' name='vmx-cr8-load-exit'/>
+    <feature policy='require' name='vmx-cr8-store-exit'/>
+    <feature policy='require' name='vmx-flexpriority'/>
+    <feature policy='require' name='vmx-vnmi-pending'/>
+    <feature policy='require' name='vmx-movdr-exit'/>
+    <feature policy='require' name='vmx-io-exit'/>
+    <feature policy='require' name='vmx-io-bitmap'/>
+    <feature policy='require' name='vmx-mtf'/>
+    <feature policy='require' name='vmx-msr-bitmap'/>
+    <feature policy='require' name='vmx-monitor-exit'/>
+    <feature policy='require' name='vmx-pause-exit'/>
+    <feature policy='require' name='vmx-secondary-ctls'/>
+    <feature policy='require' name='vmx-exit-nosave-debugctl'/>
+    <feature policy='require' name='vmx-exit-load-perf-global-ctrl'/>
+    <feature policy='require' name='vmx-exit-ack-intr'/>
+    <feature policy='require' name='vmx-exit-save-pat'/>
+    <feature policy='require' name='vmx-exit-load-pat'/>
+    <feature policy='require' name='vmx-exit-save-efer'/>
+    <feature policy='require' name='vmx-exit-load-efer'/>
+    <feature policy='require' name='vmx-exit-save-preemption-timer'/>
+    <feature policy='require' name='vmx-entry-noload-debugctl'/>
+    <feature policy='require' name='vmx-entry-ia32e-mode'/>
+    <feature policy='require' name='vmx-entry-load-perf-global-ctrl'/>
+    <feature policy='require' name='vmx-entry-load-pat'/>
+    <feature policy='require' name='vmx-entry-load-efer'/>
+    <feature policy='require' name='vmx-eptp-switching'/>
+    <feature policy='disable' name='hle'/>
+    <feature policy='disable' name='rtm'/>
+    <feature policy='disable' name='taa-no'/>
+  </cpu>
+  <clock offset='utc'>
+    <timer name='pit' tickpolicy='delay'/>
+    <timer name='rtc' tickpolicy='catchup'/>
+    <timer name='hpet' present='no'/>
+  </clock>
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>destroy</on_crash>
+  <devices>
+    <emulator>/usr/bin/qemu-system-x86_64</emulator>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='raw' cache='none' io='native'/>
+      <source file='/var/lib/nova/mnt/00000000000000000000000000000003/volume-90000000-0000-4000-8000-000000000003' index='1'/>
+      <backingStore/>
+      <target dev='vda' bus='virtio'/>
+      <serial>90000000-0000-4000-8000-000000000003</serial>
+      <alias name='ua-90000000-0000-4000-8000-000000000003'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x04' function='0x0'/>
+    </disk>
+    <controller type='usb' index='0' model='piix3-uhci'>
+      <alias name='usb'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x01' function='0x2'/>
+    </controller>
+    <controller type='pci' index='0' model='pci-root'>
+      <alias name='pci.0'/>
+    </controller>
+    <interface type='ethernet'>
+      <mac address='fa:16:3e:00:00:01'/>
+      <target dev='tap90000000-00'/>
+      <model type='virtio'/>
+      <mtu size='1442'/>
+      <alias name='net1'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x08' function='0x0'/>
+    </interface>
+    <serial type='pty'>
+      <source path='/dev/pts/0'/>
+      <log file='/var/lib/nova/instances/10000000-0000-4000-8000-000000000001/console.log' append='off'/>
+      <target type='isa-serial' port='0'>
+        <model name='isa-serial'/>
+      </target>
+      <alias name='serial0'/>
+    </serial>
+    <console type='pty' tty='/dev/pts/0'>
+      <source path='/dev/pts/0'/>
+      <log file='/var/lib/nova/instances/10000000-0000-4000-8000-000000000001/console.log' append='off'/>
+      <target type='serial' port='0'/>
+      <alias name='serial0'/>
+    </console>
+    <input type='tablet' bus='usb'>
+      <alias name='input0'/>
+      <address type='usb' bus='0' port='1'/>
+    </input>
+    <input type='mouse' bus='ps2'>
+      <alias name='input1'/>
+    </input>
+    <input type='keyboard' bus='ps2'>
+      <alias name='input2'/>
+    </input>
+    <graphics type='vnc' port='5900' autoport='yes' listen='192.0.2.2'>
+      <listen type='address' address='192.0.2.2'/>
+    </graphics>
+    <audio id='1' type='none'/>
+    <video>
+      <model type='virtio' heads='1' primary='yes'/>
+      <alias name='video0'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x0'/>
+    </video>
+    <hostdev mode='subsystem' type='mdev' managed='no' model='vfio-pci' display='off'>
+      <source>
+        <address uuid='30000000-0000-4000-8000-000000000001'/>
+      </source>
+      <alias name='hostdev0'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x05' function='0x0'/>
+    </hostdev>
+    <memballoon model='virtio' autodeflate='on' freePageReporting='on'>
+      <stats period='10'/>
+      <alias name='balloon0'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x06' function='0x0'/>
+    </memballoon>
+    <rng model='virtio'>
+      <backend model='random'>/dev/urandom</backend>
+      <alias name='rng0'/>
+      <address type='pci' domain='0x0000' bus='0x00' slot='0x07' function='0x0'/>
+    </rng>
+  </devices>
+  <seclabel type='dynamic' model='dac' relabel='yes'>
+    <label>+42436:+42436</label>
+    <imagelabel>+42436:+42436</imagelabel>
+  </seclabel>
+</domain>

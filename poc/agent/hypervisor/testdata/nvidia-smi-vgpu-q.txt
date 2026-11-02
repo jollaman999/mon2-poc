@@ -1,0 +1,294 @@
+GPU 00000000:63:00.0
+    Active vGPUs                          : 4
+    vGPU ID                               : 3251634219
+        VM UUID                           : 10000000-0000-4000-8000-000000000001
+        VM Name                           : instance-00000003
+        vGPU Name                         : GRID T4-4Q
+        vGPU Type                         : 232
+        vGPU UUID                         : 20000000-0000-4000-8000-000000000001
+        MDEV UUID                         : 30000000-0000-4000-8000-000000000001
+        Guest Driver Version              : 595.91.07
+        License Status                    : Licensed (Expiry: 2026-10-22 19:56:13 GMT)
+        GPU Instance ID                   : N/A
+        Placement ID                      : N/A
+        Accounting Mode                   : Disabled
+        ECC Mode                          : Enabled
+        Accounting Buffer Size            : 4000
+        Frame Rate Limit                  : 60 FPS
+        PCI
+            Bus Id                        : 00000000:00:05.0
+        FB Memory Usage
+            Total                         : 4096 MiB
+            Used                          : 0 MiB
+            Free                          : 4096 MiB
+        Utilization
+            GPU                           : 0 %
+            Memory                        : 0 %
+            Encoder                       : 0 %
+            Decoder                       : 0 %
+            Jpeg                          : 0 %
+            Ofa                           : 0 %
+        Encoder Stats
+            Active Sessions               : 0
+            Average FPS                   : 0
+            Average Latency               : 0
+        FBC Stats
+            Active Sessions               : 0
+            Average FPS                   : 0
+            Average Latency               : 0
+    vGPU ID                               : 3251634295
+        VM UUID                           : 10000000-0000-4000-8000-000000000002
+        VM Name                           : instance-00000004
+        vGPU Name                         : GRID T4-4Q
+        vGPU Type                         : 232
+        vGPU UUID                         : 20000000-0000-4000-8000-000000000002
+        MDEV UUID                         : 30000000-0000-4000-8000-000000000002
+        Guest Driver Version              : 596.86
+        License Status                    : Licensed (Expiry: 2026-10-22 21:57:57 GMT)
+        GPU Instance ID                   : N/A
+        Placement ID                      : N/A
+        Accounting Mode                   : Disabled
+        ECC Mode                          : Enabled
+        Accounting Buffer Size            : 4000
+        Frame Rate Limit                  : 60 FPS
+        PCI
+            Bus Id                        : 00000000:00:05.0
+        FB Memory Usage
+            Total                         : 4096 MiB
+            Used                          : 973 MiB
+            Free                          : 3123 MiB
+        Utilization
+            GPU                           : 0 %
+            Memory                        : 0 %
+            Encoder                       : 0 %
+            Decoder                       : 0 %
+            Jpeg                          : 0 %
+            Ofa                           : 0 %
+        Encoder Stats
+            Active Sessions               : 0
+            Average FPS                   : 0
+            Average Latency               : 0
+        FBC Stats
+            Active Sessions               : 0
+            Average FPS                   : 0
+            Average Latency               : 0
+    vGPU ID                               : 3251635619
+        VM UUID                           : 10000000-0000-4000-8000-000000000003
+        VM Name                           : instance-00000005
+        vGPU Name                         : GRID T4-4Q
+        vGPU Type                         : 232
+        vGPU UUID                         : 20000000-0000-4000-8000-000000000003
+        MDEV UUID                         : 30000000-0000-4000-8000-000000000003
+        Guest Driver Version              : 596.86
+        License Status                    : Licensed (Expiry: 2026-10-22 23:4:18 GMT)
+        GPU Instance ID                   : N/A
+        Placement ID                      : N/A
+        Accounting Mode                   : Disabled
+        ECC Mode                          : Enabled
+        Accounting Buffer Size            : 4000
+        Frame Rate Limit                  : 60 FPS
+        PCI
+            Bus Id                        : 00000000:00:05.0
+        FB Memory Usage
+            Total                         : 4096 MiB
+            Used                          : 991 MiB
+            Free                          : 3105 MiB
+        Utilization
+            GPU                           : 0 %
+            Memory                        : 0 %
+            Encoder                       : 0 %
+            Decoder                       : 0 %
+            Jpeg                          : 0 %
+            Ofa                           : 0 %
+        Encoder Stats
+            Active Sessions               : 0
+            Average FPS                   : 0
+            Average Latency               : 0
+        FBC Stats
+            Active Sessions               : 0
+            Average FPS                   : 0
+            Average Latency               : 0
+    vGPU ID                               : 3251635941
+        VM UUID                           : 10000000-0000-4000-8000-000000000004
+        VM Name                           : instance-0000000c
+        vGPU Name                         : GRID T4-4Q
+        vGPU Type                         : 232
+        vGPU UUID                         : 20000000-0000-4000-8000-000000000004
+        MDEV UUID                         : 30000000-0000-4000-8000-000000000004
+        Guest Driver Version              : 595.91.07
+        License Status                    : Licensed (Expiry: 2026-11-3 7:52:36 GMT)
+        GPU Instance ID                   : N/A
+        Placement ID                      : N/A
+        Accounting Mode                   : Disabled
+        ECC Mode                          : Enabled
+        Accounting Buffer Size            : 4000
+        Frame Rate Limit                  : 60 FPS
+        PCI
+            Bus Id                        : 00000000:00:05.0
+        FB Memory Usage
+            Total                         : 4096 MiB
+            Used                          : 2935 MiB
+            Free                          : 1161 MiB
+        Utilization
+            GPU                           : 0 %
+            Memory                        : 0 %
+            Encoder                       : 0 %
+            Decoder                       : 0 %
+            Jpeg                          : 0 %
+            Ofa                           : 0 %
+        Encoder Stats
+            Active Sessions               : 0
+            Average FPS                   : 0
+            Average Latency               : 0
+        FBC Stats
+            Active Sessions               : 0
+            Average FPS                   : 0
+            Average Latency               : 0
+
+GPU 00000000:AB:00.0
+    Active vGPUs                          : 4
+    vGPU ID                               : 3251635318
+        VM UUID                           : 10000000-0000-4000-8000-000000000005
+        VM Name                           : instance-00000007
+        vGPU Name                         : GRID T4-4Q
+        vGPU Type                         : 232
+        vGPU UUID                         : 20000000-0000-4000-8000-000000000005
+        MDEV UUID                         : 30000000-0000-4000-8000-000000000005
+        Guest Driver Version              : 596.86
+        License Status                    : Licensed (Expiry: 2026-11-2 22:48:59 GMT)
+        GPU Instance ID                   : N/A
+        Placement ID                      : N/A
+        Accounting Mode                   : Disabled
+        ECC Mode                          : Enabled
+        Accounting Buffer Size            : 4000
+        Frame Rate Limit                  : 60 FPS
+        PCI
+            Bus Id                        : 00000000:00:05.0
+        FB Memory Usage
+            Total                         : 4096 MiB
+            Used                          : 948 MiB
+            Free                          : 3148 MiB
+        Utilization
+            GPU                           : 0 %
+            Memory                        : 0 %
+            Encoder                       : 0 %
+            Decoder                       : 0 %
+            Jpeg                          : 0 %
+            Ofa                           : 0 %
+        Encoder Stats
+            Active Sessions               : 0
+            Average FPS                   : 0
+            Average Latency               : 0
+        FBC Stats
+            Active Sessions               : 0
+            Average FPS                   : 0
+            Average Latency               : 0
+    vGPU ID                               : 3251635467
+        VM UUID                           : 10000000-0000-4000-8000-000000000006
+        VM Name                           : instance-00000006
+        vGPU Name                         : GRID T4-4Q
+        vGPU Type                         : 232
+        vGPU UUID                         : 20000000-0000-4000-8000-000000000006
+        MDEV UUID                         : 30000000-0000-4000-8000-000000000006
+        Guest Driver Version              : 596.86
+        License Status                    : Unlicensed (Unrestricted)
+        GPU Instance ID                   : N/A
+        Placement ID                      : N/A
+        Accounting Mode                   : Disabled
+        ECC Mode                          : Enabled
+        Accounting Buffer Size            : 4000
+        Frame Rate Limit                  : 60 FPS
+        PCI
+            Bus Id                        : 00000000:00:05.0
+        FB Memory Usage
+            Total                         : 4096 MiB
+            Used                          : 674 MiB
+            Free                          : 3422 MiB
+        Utilization
+            GPU                           : 0 %
+            Memory                        : 0 %
+            Encoder                       : 0 %
+            Decoder                       : 0 %
+            Jpeg                          : 0 %
+            Ofa                           : 0 %
+        Encoder Stats
+            Active Sessions               : 0
+            Average FPS                   : 0
+            Average Latency               : 0
+        FBC Stats
+            Active Sessions               : 0
+            Average FPS                   : 0
+            Average Latency               : 0
+    vGPU ID                               : 3251635947
+        VM UUID                           : 10000000-0000-4000-8000-000000000007
+        VM Name                           : instance-0000000d
+        vGPU Name                         : GRID T4-4Q
+        vGPU Type                         : 232
+        vGPU UUID                         : 20000000-0000-4000-8000-000000000007
+        MDEV UUID                         : 30000000-0000-4000-8000-000000000007
+        Guest Driver Version              : 595.91.07
+        License Status                    : Licensed (Expiry: 2026-11-3 7:54:18 GMT)
+        GPU Instance ID                   : N/A
+        Placement ID                      : N/A
+        Accounting Mode                   : Disabled
+        ECC Mode                          : Enabled
+        Accounting Buffer Size            : 4000
+        Frame Rate Limit                  : 60 FPS
+        PCI
+            Bus Id                        : 00000000:00:05.0
+        FB Memory Usage
+            Total                         : 4096 MiB
+            Used                          : 0 MiB
+            Free                          : 4096 MiB
+        Utilization
+            GPU                           : 0 %
+            Memory                        : 0 %
+            Encoder                       : 0 %
+            Decoder                       : 0 %
+            Jpeg                          : 0 %
+            Ofa                           : 0 %
+        Encoder Stats
+            Active Sessions               : 0
+            Average FPS                   : 0
+            Average Latency               : 0
+        FBC Stats
+            Active Sessions               : 0
+            Average FPS                   : 0
+            Average Latency               : 0
+    vGPU ID                               : 3251636405
+        VM UUID                           : 10000000-0000-4000-8000-000000000008
+        VM Name                           : instance-00000011
+        vGPU Name                         : GRID T4-4Q
+        vGPU Type                         : 232
+        vGPU UUID                         : 20000000-0000-4000-8000-000000000008
+        MDEV UUID                         : 30000000-0000-4000-8000-000000000008
+        Guest Driver Version              : 595.91.07
+        License Status                    : Licensed (Expiry: 2026-11-3 7:40:6 GMT)
+        GPU Instance ID                   : N/A
+        Placement ID                      : N/A
+        Accounting Mode                   : Disabled
+        ECC Mode                          : Enabled
+        Accounting Buffer Size            : 4000
+        Frame Rate Limit                  : 60 FPS
+        PCI
+            Bus Id                        : 00000000:00:05.0
+        FB Memory Usage
+            Total                         : 4096 MiB
+            Used                          : 0 MiB
+            Free                          : 4096 MiB
+        Utilization
+            GPU                           : 0 %
+            Memory                        : 0 %
+            Encoder                       : 0 %
+            Decoder                       : 0 %
+            Jpeg                          : 0 %
+            Ofa                           : 0 %
+        Encoder Stats
+            Active Sessions               : 0
+            Average FPS                   : 0
+            Average Latency               : 0
+        FBC Stats
+            Active Sessions               : 0
+            Average FPS                   : 0
+            Average Latency               : 0
+

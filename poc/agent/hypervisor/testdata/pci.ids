@@ -1,0 +1,13 @@
+#
+#	pci.ids 발췌 (PCI ID Project, https://pci-ids.ucw.cz/, 2026.07.21). 시험용으로 몇 줄만 남겼다.
+#
+1002  Advanced Micro Devices, Inc. [AMD/ATI]
+	1eb8  가짜 항목 (다른 vendor 의 같은 device id 를 고르지 않는지 본다)
+10de  NVIDIA Corporation
+	1db6  GV100GL [Tesla V100 PCIe 32GB]
+	1eb8  TU104GL [Tesla T4]
+	20b5  GA100 [A100 PCIe 80GB]
+	2236  GA102GL [A10]
+	26b9  AD102GL [L40S]
+		10de 12a2  Tesla T4 subsystem 줄 (쓰지 않는다)
+10df  Emulex Corporation
