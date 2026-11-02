@@ -1,0 +1,18 @@
+{
+  "KMD_version": "3.5.1",
+  "devices": [
+    {
+      "npu": 0,
+      "name": "RBLN-CR13",
+      "sid": "SAMPLE_SID_0000",
+      "uuid": "11111111-2222-3333-4444-555555555555",
+      "device": "rbln0",
+      "temperature": "24C",
+      "card_power": "100000000uW",
+      "pstate": "P14",
+      "memory": { "used": "0", "total": "150323855360" },
+      "util": "0.0"
+    }
+  ],
+  "contexts": []
+}

@@ -1,9 +1,10 @@
 module github.com/jollaman999/mon2-poc/agent/accelerator
 
-go 1.26.0
+go 1.27.2
 
 require (
 	github.com/ebitengine/purego v0.10.2
+	github.com/furiosa-ai/furiosa-smi-go v1.0.0
 	go.opentelemetry.io/collector/component v1.70.0
 	go.opentelemetry.io/collector/component/componenttest v0.164.0
 	go.opentelemetry.io/collector/consumer v1.70.0

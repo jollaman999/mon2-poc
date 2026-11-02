@@ -1,0 +1,28 @@
+{
+  "gpu_data": [
+      {
+          "gpu": 0,
+          "limit": {
+              "ppt0": {
+                  "max_power_limit": {
+                      "value": 203,
+                      "unit": "W"
+                  },
+                  "min_power_limit": {
+                      "value": 0,
+                      "unit": "W"
+                  },
+                  "socket_power_limit": {
+                      "value": 100,
+                      "unit": "W"
+                  }
+              },
+              "ppt1": {
+                  "max_power_limit": "N/A",
+                  "min_power_limit": "N/A",
+                  "socket_power_limit": "N/A"
+              }
+          }
+      }
+  ]
+}

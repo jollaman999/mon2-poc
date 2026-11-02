@@ -10,7 +10,10 @@ import (
 	"go.opentelemetry.io/collector/scraper"
 	"go.opentelemetry.io/collector/scraper/scraperhelper"
 
+	"github.com/jollaman999/mon2-poc/agent/accelerator/amd"
+	"github.com/jollaman999/mon2-poc/agent/accelerator/furiosa"
 	"github.com/jollaman999/mon2-poc/agent/accelerator/nvidia"
+	"github.com/jollaman999/mon2-poc/agent/accelerator/rebellions"
 )
 
 const typeStr = "accelerator"
@@ -30,6 +33,9 @@ func createDefaultConfig() component.Config {
 		ControllerConfig: cc,
 		CommonNames:      true,
 		NVIDIA:           nvidia.DefaultConfig(),
+		AMD:              amd.DefaultConfig(),
+		Rebellions:       rebellions.DefaultConfig(),
+		Furiosa:          furiosa.DefaultConfig(),
 	}
 }
 

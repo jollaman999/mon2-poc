@@ -10,19 +10,25 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/scraper/scraperhelper"
 
+	"github.com/jollaman999/mon2-poc/agent/accelerator/amd"
+	"github.com/jollaman999/mon2-poc/agent/accelerator/furiosa"
 	"github.com/jollaman999/mon2-poc/agent/accelerator/nvidia"
+	"github.com/jollaman999/mon2-poc/agent/accelerator/rebellions"
 )
 
 type Config struct {
 	scraperhelper.ControllerConfig `mapstructure:",squash"`
 
-	// 켤 백엔드 이름 목록 (nvidia, ...). 비우면 도구가 있는 백엔드를 모두 켠다.
+	// 켤 백엔드 이름 목록 (nvidia, amd, rebellions, furiosa). 비우면 도구가 있는 백엔드를 모두 켠다.
 	Backends []string `mapstructure:"backends"`
 	// 공통 이름 지표(accelerator.gpu_util 등)를 같이 낼지. 기본 true.
 	CommonNames bool `mapstructure:"common_names"`
 
 	// 백엔드별 설정. 백엔드를 더하면 여기에 한 줄 더한다.
-	NVIDIA nvidia.Config `mapstructure:"nvidia"`
+	NVIDIA     nvidia.Config     `mapstructure:"nvidia"`
+	AMD        amd.Config        `mapstructure:"amd"`
+	Rebellions rebellions.Config `mapstructure:"rebellions"`
+	Furiosa    furiosa.Config    `mapstructure:"furiosa"`
 }
 
 var _ component.Config = (*Config)(nil)
@@ -47,6 +53,15 @@ func (c *Config) Validate() error {
 	if c.NVIDIA.GPM.Enabled && c.NVIDIA.GPM.SampleInterval >= c.CollectionInterval {
 		return fmt.Errorf("nvidia.gpm.sample_interval(%s) 은 collection_interval(%s) 보다 짧아야 한다",
 			c.NVIDIA.GPM.SampleInterval, c.CollectionInterval)
+	}
+	if err := c.AMD.Validate(); err != nil {
+		return fmt.Errorf("amd: %w", err)
+	}
+	if err := c.Rebellions.Validate(); err != nil {
+		return fmt.Errorf("rebellions: %w", err)
+	}
+	if err := c.Furiosa.Validate(); err != nil {
+		return fmt.Errorf("furiosa: %w", err)
 	}
 	return nil
 }

@@ -1,0 +1,18 @@
+{
+  "KMD_version": "3.4.1",
+  "devices": [
+    {
+      "npu": 0,
+      "name": "RBLN-CA25",
+      "sid": "SAMPLE_SID_0000",
+      "uuid": "11111111-2222-3333-4444-555555555555",
+      "device": "rbln0",
+      "temperature": "24C",
+      "card_power": "41448540uW",
+      "pstate": "P14",
+      "memory": { "used": "0", "total": "16877879296" },
+      "util": "0.0"
+    }
+  ],
+  "contexts": []
+}

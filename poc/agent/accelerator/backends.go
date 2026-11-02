@@ -3,8 +3,11 @@ package accelerator
 import (
 	"go.uber.org/zap"
 
+	"github.com/jollaman999/mon2-poc/agent/accelerator/amd"
 	"github.com/jollaman999/mon2-poc/agent/accelerator/backend"
+	"github.com/jollaman999/mon2-poc/agent/accelerator/furiosa"
 	"github.com/jollaman999/mon2-poc/agent/accelerator/nvidia"
+	"github.com/jollaman999/mon2-poc/agent/accelerator/rebellions"
 )
 
 // backendFactory 는 백엔드 하나를 만드는 법이다.
@@ -17,6 +20,9 @@ type backendFactory struct {
 // 백엔드를 더하면 여기에 한 줄, Config 에 설정 한 줄을 더한다.
 var backendFactories = []backendFactory{
 	{"nvidia", func(c *Config, l *zap.Logger) backend.Backend { return nvidia.New(c.NVIDIA, l) }},
+	{"amd", func(c *Config, l *zap.Logger) backend.Backend { return amd.New(c.AMD, l) }},
+	{"rebellions", func(c *Config, l *zap.Logger) backend.Backend { return rebellions.New(c.Rebellions, l) }},
+	{"furiosa", func(c *Config, l *zap.Logger) backend.Backend { return furiosa.New(c.Furiosa, l) }},
 }
 
 func knownBackend(name string) bool {
