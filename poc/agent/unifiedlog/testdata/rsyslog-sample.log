@@ -1,0 +1,4 @@
+2026-04-22T10:15:30.577333+09:00 web-01 sshd[1234]: Accepted publickey for root from 192.0.2.7 port 52144
+Apr 22 10:15:31 web-01 CRON[2201]: (root) CMD (run-parts /etc/cron.hourly)
+2026-04-22T10:15:32+09:00 web-01 kernel: EXT4-fs (sda1): mounted filesystem
+this line matches no regex
