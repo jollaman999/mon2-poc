@@ -1,0 +1,22 @@
+# OCB(OpenTelemetry Collector Builder) 부품 목록. build.sh 가 쓴다.
+dist:
+  name: cmp-otelcol
+  description: cmp-mon 에이전트 (PoC)
+  version: 0.1.0-poc
+  output_path: ./_build
+
+receivers:
+  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.164.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.164.0
+processors:
+  - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.164.0
+  - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.164.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor v0.164.0
+exporters:
+  - gomod: github.com/jollaman999/mon2-poc/agent/cmpotlp v0.0.0
+  - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.164.0
+extensions:
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.164.0
+
+replaces:
+  - github.com/jollaman999/mon2-poc/agent/cmpotlp => ../cmpotlp

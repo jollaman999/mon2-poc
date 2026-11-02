@@ -1,0 +1,61 @@
+# cmp-otelcol PoC 설정. run-poc.sh 가 @...@ 를 채운다.
+extensions:
+  file_storage:
+    directory: @QUEUE_DIR@
+    create_directory: true
+
+receivers:
+  hostmetrics:
+    collection_interval: @INTERVAL@
+    scrapers:
+      cpu: {}
+      memory: {}
+      load: {}
+  otlp:
+    protocols:
+      http:
+        endpoint: 127.0.0.1:14318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+  resourcedetection:
+    detectors: [system]
+    system:
+      hostname_sources: [os]
+  batch:
+    timeout: 1s
+
+exporters:
+  cmpotlp:
+    endpoints: [@ENDPOINTS@]
+    start_key: "@START_KEY@"           # 비우면 호스트 이름
+    failback_interval: @FAILBACK@
+    timeout: 5s
+    tls:
+      insecure_skip_verify: true       # 사설 인증서 (TLS_VERIFY=skip)
+    sending_queue:
+      storage: file_storage
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 0               # 큐에 있는 동안 계속 재시도
+
+service:
+  extensions: [file_storage]
+  telemetry:
+    logs:
+      level: info
+  pipelines:
+    metrics:
+      receivers: [hostmetrics, otlp]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [cmpotlp]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [cmpotlp]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [cmpotlp]

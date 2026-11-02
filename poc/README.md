@@ -15,7 +15,11 @@
 | `central/conf/` | Alertmanager 설정, vmalert 규칙, 자체 감시 scrape |
 | `central/gen-gateway.sh` | vmauth 입구 설정(경로 · 토큰)을 만든다 |
 | `central/uninstall.sh` | 지우기 (`bin/deploy-central.sh uninstall`) |
+| `agent/` | 에이전트 `cmp-otelcol`. `cmpotlp/` 는 주소 목록 출력(Go), `builder-config.yaml` 은 OCB 부품 목록, `build.sh` 가 정적 바이너리를 만든다, `run-poc.sh` 는 시험용으로 한 호스트에 띄운다 |
 | `checks/central-health.sh` | 서비스 상태 · 포트 응답 · SELinux 거부(AVC)를 본다 |
+| `checks/failover.sh` · `failover-suite.sh` | 중앙 노드 장애 시험 (중계 정지 · 노드 정지 · 노드 사이 차단) |
+| `checks/crash-test.sh` · `gen-load.py` | 갑자기 죽였을 때 잃는 양 (중계 `kill -9`, 노드 강제 재시작) |
+| `checks/agent-failover.sh` | 에이전트 전환 · 복귀 시험 (노드 B 입구 정지, 노드 B 로 가는 길 차단) |
 
 ## 중앙 노드에 깔리는 것
 
@@ -56,6 +60,18 @@ bin/deploy-central.sh all                 # A, B 순서로 설치 (NODE_B 가 �
 checks/central-health.sh                  # 상태 · AVC 확인
 bin/deploy-central.sh uninstall all       # 전부 지우기 (데이터 포함)
 ```
+
+## 에이전트 (cmp-otelcol)
+
+```sh
+agent/build.sh                                  # OCB 로 정적 바이너리 (agent/_build/cmp-otelcol, 커밋 안 함)
+agent/run-poc.sh start <호스트> [start_key]      # 시험용으로 띄우기 (~/cmp-agent, 서비스로 설치하지 않음)
+agent/run-poc.sh log <호스트>; agent/run-poc.sh stop <호스트>
+```
+
+- `cmpotlp` 는 노드 주소 목록 중 한 곳에만 보낸다. 시작 주소는 호스트 이름(또는 `start_key`)의 해시로 고르고, 실패하면 다음 주소로, `failback_interval` 마다 시작 주소로 돌아가기를 시도한다 (설계 문서 3.11).
+- 보내기 전에 `file_storage` 디스크 큐에 쌓는다.
+- PoC 설정은 1초마다 호스트 메트릭을 걷는다 (`INTERVAL`). 빠진 초가 있는지 세기 위해서다.
 
 ## 노드에 인터넷 DNS 가 없을 때
 
