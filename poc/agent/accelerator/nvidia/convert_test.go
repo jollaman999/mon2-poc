@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/jollaman999/mon2-poc/agent/accelerator/backend"
+	"github.com/jollaman999/mon2-poc/agent/accelerator/nvidia/gpm"
 )
 
 func parseFile(t *testing.T, name string) []record {
@@ -287,8 +288,8 @@ func TestReadmeListsEveryName(t *testing.T) {
 			names = append(names, s.name)
 		}
 	}
-	for _, m := range gpmMetrics {
-		names = append(names, m.name)
+	for _, m := range gpm.Metrics {
+		names = append(names, m.Name)
 	}
 	for _, f := range infoFields {
 		names = append(names, f.attr)

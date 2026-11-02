@@ -2,7 +2,6 @@ package nvidia
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -37,22 +36,41 @@ func fakeSMI(t *testing.T, xmlFile string, exitCode int) string {
 	return p
 }
 
-func newTestBackend(binPath string, gpm gpmLib) *Backend {
+// fakeGPM 은 가짜 cmp-gpm 을 만든다. -interval 1s 로 불리면 out 을 내고 code 로 끝난다.
+// 다른 인자로 불리면 9 로 끝나 시험이 잡는다.
+func fakeGPM(t *testing.T, out string, code int) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("셸 스크립트로 가짜 cmp-gpm 을 만든다")
+	}
+	script := "#!/bin/sh\n" +
+		"[ \"$1\" = -interval ] && [ \"$2\" = 1s ] || { echo \"bad args: $*\" >&2; exit 9; }\n" +
+		"cat <<'JSON'\n" + out + "\nJSON\n"
+	if code != 0 {
+		script += "echo 'gpm failed' >&2\n"
+	}
+	script += "exit " + string(rune('0'+code)) + "\n"
+	p := filepath.Join(t.TempDir(), "cmp-gpm")
+	if err := os.WriteFile(p, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+// newTestBackend 는 gpmPath 가 비면 GPM 을 끈 백엔드를 만든다.
+func newTestBackend(binPath, gpmPath string) *Backend {
 	cfg := DefaultConfig()
 	cfg.BinPath = binPath
-	b := New(cfg, nil)
-	b.openGPM = func() (gpmLib, error) {
-		if gpm == nil {
-			return nil, errNVMLUnavailable
-		}
-		return gpm, nil
+	if gpmPath == "" {
+		cfg.GPM.Enabled = false
+	} else {
+		cfg.GPM.BinPath = gpmPath
 	}
-	b.sleep = func(time.Duration) {}
-	return b
+	return New(cfg, nil)
 }
 
 func TestDetectMissing(t *testing.T) {
-	b := newTestBackend(filepath.Join(t.TempDir(), "nope"), nil)
+	b := newTestBackend(filepath.Join(t.TempDir(), "nope"), "")
 	if b.Detect() {
 		t.Fatal("없는 경로인데 Detect 가 true")
 	}
@@ -62,16 +80,13 @@ func TestDetectMissing(t *testing.T) {
 }
 
 func TestCollectWithFakeSMI(t *testing.T) {
-	b := newTestBackend(fakeSMI(t, "rtx-pro-6000-v13.xml", 0), nil)
+	b := newTestBackend(fakeSMI(t, "rtx-pro-6000-v13.xml", 0), "")
 	if !b.Detect() {
 		t.Fatal("Detect false")
 	}
 	ctx := context.Background()
 	if err := b.Start(ctx); err != nil {
 		t.Fatal(err)
-	}
-	if b.gpm != nil {
-		t.Fatal("NVML 이 없으면 GPM 은 꺼져야 한다")
 	}
 	s, err := b.Collect(ctx)
 	if err != nil {
@@ -95,9 +110,9 @@ func TestCollectWithFakeSMI(t *testing.T) {
 
 func TestCollectWithGPM(t *testing.T) {
 	uuid := "GPU-513536b6-7d19-9063-b049-1e69664bb298"
-	f := newFakeGPM(fakeDev{uuid: uuid, deviceOK: true, instances: []uint32{3},
-		values: map[uint32]float64{1: 40}, migValues: map[uint32]float64{1: 60}})
-	b := newTestBackend(fakeSMI(t, "a100-sxm4-v12.xml", 0), f)
+	out := `{"results":[{"uuid":"` + uuid + `","values":{"nvidia.gpm.graphics.utilization":40}},` +
+		`{"uuid":"` + uuid + `","mig":true,"gpu_instance_id":3,"values":{"nvidia.gpm.graphics.utilization":63}}]}`
+	b := newTestBackend(fakeSMI(t, "a100-sxm4-v12.xml", 0), fakeGPM(t, out, 0))
 	ctx := context.Background()
 	if err := b.Start(ctx); err != nil {
 		t.Fatal(err)
@@ -112,15 +127,15 @@ func TestCollectWithGPM(t *testing.T) {
 	if got := one(t, s, gpmGraphicsUtil, map[string]any{attrMIGGPUInstance: "3"}); got.Value != 63 {
 		t.Errorf("MIG graphics = %v", got.Value)
 	}
-	if err := b.Shutdown(ctx); err != nil || !f.closed {
-		t.Fatalf("Shutdown err=%v closed=%v", err, f.closed)
+	if err := b.Shutdown(ctx); err != nil {
+		t.Fatal(err)
 	}
 }
 
 // nvidia-smi 가 실패해도 GPM 값은 내고, 오류에는 표준 에러가 담긴다.
 func TestCollectSMIFails(t *testing.T) {
-	f := newFakeGPM(fakeDev{uuid: "GPU-x", deviceOK: true, values: map[uint32]float64{1: 5}})
-	b := newTestBackend(fakeSMI(t, "", 3), f)
+	out := `{"results":[{"uuid":"GPU-x","values":{"nvidia.gpm.graphics.utilization":5}}]}`
+	b := newTestBackend(fakeSMI(t, "", 3), fakeGPM(t, out, 0))
 	ctx := context.Background()
 	if err := b.Start(ctx); err != nil {
 		t.Fatal(err)
@@ -131,6 +146,52 @@ func TestCollectSMIFails(t *testing.T) {
 	}
 	one(t, s, gpmGraphicsUtil, map[string]any{backend.AttrID: "GPU-x"})
 	one(t, s, "accelerator.gpu_util", map[string]any{backend.AttrID: "GPU-x"})
+}
+
+// cmp-gpm 이 실패 · JSON 아님 · 건너뜀이면 GPM 만 빠지고 nvidia-smi 값은 오류 없이 나간다.
+func TestCollectGPMSkipped(t *testing.T) {
+	cases := map[string]string{}
+	cases["실패"] = fakeGPM(t, "", 1)
+	cases["JSON 아님"] = fakeGPM(t, "not json", 0)
+	cases["건너뜀"] = fakeGPM(t, `{"results":[],"skipped":"GPM 을 지원하는 장치 · MIG 인스턴스가 없다"}`, 0)
+	for name, gp := range cases {
+		t.Run(name, func(t *testing.T) {
+			b := newTestBackend(fakeSMI(t, "rtx-pro-6000-v13.xml", 0), gp)
+			ctx := context.Background()
+			if err := b.Start(ctx); err != nil {
+				t.Fatal(err)
+			}
+			s, err := b.Collect(ctx)
+			if err != nil {
+				t.Fatalf("GPM 실패가 수집 오류가 되면 안 된다: %v", err)
+			}
+			if got := find(s, gpmGraphicsUtil, nil); len(got) != 0 {
+				t.Errorf("GPM 지표가 나왔다: %v", got)
+			}
+			one(t, s, "accelerator.mem_used", map[string]any{backend.AttrID: "GPU-00000000-0000-4000-8000-000000000002"})
+		})
+	}
+}
+
+// cmp-gpm 이 없으면 Start 는 성공하고 GPM 만 꺼진다.
+func TestStartWithoutGPM(t *testing.T) {
+	b := newTestBackend(fakeSMI(t, "rtx-pro-6000-v13.xml", 0), filepath.Join(t.TempDir(), "cmp-gpm"))
+	if err := b.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if b.gpmPath != "" {
+		t.Fatalf("없는 cmp-gpm 을 골랐다: %s", b.gpmPath)
+	}
+}
+
+func TestFindGPMBinPath(t *testing.T) {
+	gp := fakeGPM(t, "{}", 0)
+	if p, err := findGPM(gp); err != nil || p != gp {
+		t.Fatalf("bin_path %s -> %s, %v", gp, p, err)
+	}
+	if _, err := findGPM(t.TempDir()); err == nil {
+		t.Fatal("폴더를 cmp-gpm 으로 골랐다")
+	}
 }
 
 func TestConfigValidate(t *testing.T) {
@@ -150,16 +211,4 @@ func TestConfigValidate(t *testing.T) {
 	if err := c.Validate(); err == nil {
 		t.Error("timeout 0 을 받았다")
 	}
-}
-
-func TestOpenGPMWithoutLibrary(t *testing.T) {
-	// 이 시험 호스트에 libnvidia-ml 이 있으면 실제로 열리므로 확인만 하고 넘어간다.
-	lib, err := openGPM()
-	if err != nil {
-		if !errors.Is(err, errNVMLUnavailable) && !strings.Contains(err.Error(), "NVML") && !strings.Contains(err.Error(), "nvml") {
-			t.Errorf("예상 밖 오류: %v", err)
-		}
-		return
-	}
-	lib.shutdown()
 }

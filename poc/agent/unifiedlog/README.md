@@ -15,7 +15,7 @@ InfluxData Telegraf `inputs.win_eventlog`(MIT)에서 옮겼다. Telegraf 의존�
 | `services` | Linux, `/proc` 이 있다 | `/proc/<pid>/fd` 의 쓰기 모드 파일 + docker/podman REST + CRI gRPC 로 찾은 컨테이너 로그 |
 
 `priority` 의 앞에서부터 처음으로 쓸 수 있는 syslog 계열 원천 하나를 고른다. 기본은 Linux 등 `[rsyslog, journald]`,
-Windows `[eventlog]` 다. `services` 는 고른 원천과 함께 돈다. 고를 원천이 없으면 원본처럼 Start 가 실패한다.
+Windows `[eventlog]` 다. `services` 는 고른 원천과 함께 돈다. 고를 원천이 없으면 원본은 Start 가 실패했지만, 여기서는 경고만 남기고 아무것도 읽지 않은 채 돈다 (에이전트 전체가 서지 않게).
 
 ## 위치 기억
 
@@ -100,6 +100,7 @@ semconv 에 있는 것은 semconv 이름으로, 없는 것은 원본 키 그대�
 | `format_as_json` | `json` 필드 | 본문(Body) | OTel 에서 원문 전체의 자리 |
 | `log.iostream` | stream 을 버렸다 | docker · CRI 의 stdout/stderr 를 붙인다 | semconv 에 있는 정보 |
 | 속성 이름 | Telegraf 태그 · 필드 | 위 속성 표 | semconv |
+| 고를 원천이 없을 때 | Start 실패 | 경고를 남기고 원천 없이 돈다 | 수신기 하나 때문에 지표 · 트레이스까지 걷는 에이전트 전체가 서지 않게 |
 
 ## 시험
 

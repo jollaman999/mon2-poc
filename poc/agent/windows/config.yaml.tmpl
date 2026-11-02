@@ -1,0 +1,137 @@
+# cmp-otelcol 설정 틀 (Windows). windows/install.ps1 이 @...@ 를 채워 conf/config.yaml 로 쓴다. Linux 는 저장소의 agent/config.yaml.tmpl.
+#
+# 흐름
+#   metrics      host_metrics · accelerator · otlp
+#                -> memory_limiter -> top10process -> resource_detection -> resource(host.id) -> batch -> cmpotlp, gpujoin
+#   logs/raw     unifiedlog · otlp -> memory_limiter -> gpujoin
+#   logs         gpujoin(XID 줄에 GPU 속성을 붙인 로그) -> resource_detection -> resource -> batch -> cmpotlp
+#   metrics/xid  gpujoin(XID 횟수) -> resource_detection -> resource -> batch -> cmpotlp
+#   traces       otlp · winpackettrace -> memory_limiter -> resource_detection -> resource -> batch -> cmpotlp
+#
+# 주의
+#   - top10process 는 batch 앞에 둔다. 한 묶음이 host_metrics 한 번 수집분이어야 상위 N 을 바르게 고른다.
+#   - gpujoin 은 metrics 의 exporters 에서 accelerator 지표로 PCI 주소 -> GPU 표를 배운다. 지표를 다음으로 넘기지 않는다.
+#     metrics 의 receivers 에 gpujoin 을 넣으면 고리가 되므로 XID 지표는 metrics/xid 로 따로 받는다.
+#   - resource 는 host.id 를 Win32_ComputerSystemProduct.UUID(소문자)로 덮어쓴다. 하이퍼바이저 수신기의 hypervisor.vm.uuid 와
+#     같은 값이다. UUID 를 못 읽은 호스트는 install.ps1 이 파이프라인에서 resource 를 뺀다 (아래 값은 비어 있다).
+extensions:
+  file_storage:
+    directory: "@QUEUE_DIR@"
+    create_directory: true
+
+receivers:
+  host_metrics:
+    collection_interval: @INTERVAL@
+    scrapers:
+      cpu: {}
+      memory: {}
+      load: {}
+      # 프로세스별 지표. top10process 가 CPU · 메모리 상위 N 개만 남긴다
+      process:
+        mute_process_name_error: true
+        mute_process_exe_error: true
+        mute_process_io_error: true
+        mute_process_user_error: true
+  # GPU · NPU. 도구가 있는 백엔드만 켜진다. NVIDIA GPM 은 bin 의 cmp-gpm 을 수집 주기마다 실행한다.
+  # 주기는 설치 인자 -Interval 과 따로 10s 다. GPM 샘플 간격(1s)보다 길어야 하고, 벤더 도구 실행 비용이 있어서다
+  accelerator:
+    collection_interval: 10s
+  # Windows 이벤트 로그 (Application, System). 읽은 위치(북마크)는 file_storage 에 남긴다
+  unifiedlog:
+    priority: [eventlog]
+    storage: file_storage
+    eventlog:
+      channels: [Application, System]
+  otlp:
+    protocols:
+      http:
+        endpoint: 127.0.0.1:14318
+  # 등록 포트의 TCP 패킷으로 HTTP · DB 요청을 span 으로 만든다. ports 가 비면 아무것도 캡처하지 않는다.
+  # 예: ports: [80, 8080, 5432, 3306, 1433]
+  winpackettrace:
+    ports: []
+
+  # 아래 둘은 기본으로 끈다. 켜려면 이 설정 파일을 고쳐 receivers 와 pipelines 에 넣는다.
+  #
+  # 명령을 주기마다 실행해 출력(influx · json · prometheus)을 지표로 읽는다. metrics 의 receivers 에 exec 를 더한다
+  # exec:
+  #   collection_interval: 60s
+  #   timeout: 5s
+  #   commands: [["C:/cmp-agent/scripts/my-check.bat"]]
+  #   data_format: influx
+  #
+  # vCenter 성능 카운터(지표)와 이벤트(로그). 다른 호스트의 값이라 host.id 를 덮어쓰지 않도록 파이프라인을 따로 둔다:
+  #   metrics/vsphere: { receivers: [vsphere], processors: [memory_limiter, batch], exporters: [cmpotlp] }
+  #   logs/vsphere:    { receivers: [vsphere], processors: [memory_limiter, batch], exporters: [cmpotlp] }
+  # vsphere:
+  #   vcenters: ["https://vcenter.example.com/sdk"]
+  #   username: monitor@vsphere.local
+  #   password: ${env:VSPHERE_PASSWORD}   # 서비스 환경 변수로 준다 (레지스트리 Services\cmp-otelcol 의 Environment)
+  #   tls: { insecure_skip_verify: true }
+  #   collection_interval: 60s
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+  top10process:
+    top_n: 10
+    by: [cpu, memory]
+  resource_detection:
+    detectors: [system]
+    system:
+      hostname_sources: [os]
+  resource:
+    attributes:
+      - key: host.id
+        value: "@HOST_ID@"
+        action: upsert
+  batch:
+    timeout: 1s
+
+connectors:
+  gpujoin:
+    emit_interval: 60s
+
+exporters:
+  cmpotlp:
+    endpoints: [@ENDPOINTS@]
+    start_key: "@START_KEY@"           # 비우면 호스트 이름
+    failback_interval: @FAILBACK@
+    timeout: 5s
+    tls:
+      @TLS@                            # TLS_VERIFY=skip 이면 검증 안 함, ca 면 사설 CA 로 검증
+    sending_queue:
+      storage: file_storage
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 0               # 큐에 있는 동안 계속 재시도
+
+service:
+  extensions: [file_storage]
+  telemetry:
+    logs:
+      level: info
+      output_paths: ["@LOG_FILE@"]
+      error_output_paths: ["@LOG_FILE@"]
+  pipelines:
+    metrics:
+      receivers: [host_metrics, accelerator, otlp]
+      processors: [memory_limiter, top10process, resource_detection@HOST_ID_PROC@, batch]
+      exporters: [cmpotlp, gpujoin]
+    logs/raw:
+      receivers: [unifiedlog, otlp]
+      processors: [memory_limiter]
+      exporters: [gpujoin]
+    logs:
+      receivers: [gpujoin]
+      processors: [resource_detection@HOST_ID_PROC@, batch]
+      exporters: [cmpotlp]
+    metrics/xid:
+      receivers: [gpujoin]
+      processors: [resource_detection@HOST_ID_PROC@, batch]
+      exporters: [cmpotlp]
+    traces:
+      receivers: [otlp, winpackettrace]
+      processors: [memory_limiter, resource_detection@HOST_ID_PROC@, batch]
+      exporters: [cmpotlp]

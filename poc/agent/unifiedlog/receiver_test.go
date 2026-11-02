@@ -11,6 +11,8 @@ import (
 
 	"go.opentelemetry.io/collector/consumer/consumertest"
 	"go.opentelemetry.io/collector/pdata/plog"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestDefaultPriority(t *testing.T) {
@@ -53,14 +55,24 @@ func TestChooseSource_NoneAvailable(t *testing.T) {
 	c.Rsyslog.Files = []string{"/definitely/does/not/exist/xyz.log"}
 	c.Priority = []string{"rsyslog"}
 	r := newTestReceiver(c, new(consumertest.LogsSink))
+	core, logs := observer.New(zap.WarnLevel)
+	r.logger = zap.New(core)
 	if _, err := r.chooseSourceFrom(c.Priority); err == nil {
 		t.Fatal("쓸 수 있는 원천이 없는데 골랐다")
 	}
-	// 원본처럼 고를 원천이 없으면 Start 가 실패한다.
-	if err := r.Start(context.Background(), noStorageHost()); err == nil {
-		t.Fatal("Start 가 실패해야 한다")
+	// 원본과 달리 고를 원천이 없어도 Start 는 성공하고, 아무 원천도 고르지 않은 채 돈다.
+	if err := r.Start(context.Background(), noStorageHost()); err != nil {
+		t.Fatalf("Start 가 실패하면 안 된다: %v", err)
 	}
-	_ = r.Shutdown(context.Background())
+	if r.selected != "" {
+		t.Fatalf("고른 원천 %q, 기대 없음", r.selected)
+	}
+	if n := logs.FilterLevelExact(zap.WarnLevel).FilterMessageSnippet("원천이 없어").Len(); n != 1 {
+		t.Fatalf("경고 %d 번, 기대 1: %v", n, logs.All())
+	}
+	if err := r.Shutdown(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestResolveFiles_DedupsSymlink(t *testing.T) {

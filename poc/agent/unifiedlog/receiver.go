@@ -97,7 +97,8 @@ func (r *unifiedLogReceiver) Start(ctx context.Context, host component.Host) err
 
 	if len(syslogPriority) == 0 {
 		if !wantServices {
-			return errors.New("쓸 수 있는 로그 원천이 없다")
+			r.warnNoSource(errors.New("priority 가 비어 있다"))
+			return nil
 		}
 		r.selected = sourceServices
 		return nil
@@ -111,7 +112,8 @@ func (r *unifiedLogReceiver) Start(ctx context.Context, host component.Host) err
 			r.selected = sourceServices
 			return nil
 		}
-		return err
+		r.warnNoSource(err)
+		return nil
 	}
 	r.selected = choice
 	r.logger.Info("unifiedlog: 원천을 골랐다", zap.String("source", choice))
@@ -152,6 +154,13 @@ func (r *unifiedLogReceiver) Shutdown(ctx context.Context) error {
 		return r.store.close(ctx)
 	}
 	return nil
+}
+
+// warnNoSource 는 고를 원천이 하나도 없을 때 부른다. 원본은 Start 가 실패했지만, 에이전트는 지표 · 트레이스도
+// 함께 걷는 한 프로세스라 수신기 하나 때문에 전체가 서지 않게 경고만 남기고 아무것도 읽지 않은 채 돈다.
+func (r *unifiedLogReceiver) warnNoSource(err error) {
+	r.selected = ""
+	r.logger.Warn("unifiedlog: 쓸 수 있는 로그 원천이 없어 로그를 읽지 않는다", zap.Error(err))
 }
 
 func (r *unifiedLogReceiver) chooseSourceFrom(priority []string) (string, error) {

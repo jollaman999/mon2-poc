@@ -18,7 +18,7 @@
 | `central/uninstall.sh` | 지우기 (`bin/deploy-central.sh uninstall [--purge]`). 기본은 데이터를 남긴다 |
 | `central/reconcile-metrics.sh` | 주기 대조(메트릭). 두 노드의 1분 단위 샘플 수를 비교해 상대에만 있는 분을 복사한다. `cmp-mon-reconcile` 컨테이너(공식 vmctl 이미지)가 5분마다 돌린다 (이중화일 때만) |
 | `Makefile` | `make agent`(OCB 빌드) · `agent-package`(에이전트 묶음) · `test`(에이전트 Go 모듈 시험) · `central-bundle SRC=<원본 묶음 폴더>`(중앙 묶음) · `clean` |
-| `agent/` | 에이전트 `cmp-otelcol`. 부품(Go 모듈)마다 폴더 하나(`cmpotlp/` 는 주소 목록 출력), `builder-config.yaml` 은 OCB 부품 목록, `config.yaml.tmpl` 은 설정 틀, `install.sh` · `uninstall.sh` · `systemd/` 는 Linux 설치, `windows/` 는 Windows 설치 |
+| `agent/` | 에이전트 `cmp-otelcol`. 부품(Go 모듈)마다 폴더 하나(`cmpotlp/` 는 주소 목록 출력), `builder-config.yaml` 은 OCB 부품 목록, `config.yaml.tmpl` 은 Linux 설정 틀, `install.sh` · `uninstall.sh` · `systemd/` 는 Linux 설치, `windows/` 는 Windows 설치와 설정 틀 |
 | `bin/install-agent.sh` | 에이전트 묶음을 대상 VM 에 올려 설치 · 삭제한다 (Linux 는 SSH, Windows 는 WinRM) |
 | `checks/central-health.sh` | 컨테이너 상태 · 포트 응답 · SELinux 라벨과 거부(AVC)를 본다 |
 | `checks/failover.sh` · `failover-suite.sh` | 중앙 노드 장애 시험 (중계 컨테이너 정지 · 노드의 컨테이너 전부 정지 · 노드 사이 차단) |
@@ -76,9 +76,9 @@ bin/deploy-central.sh uninstall --purge all   # 데이터 · 이미지 · 계정
 ## 에이전트 (cmp-otelcol)
 
 ```sh
-make agent-package     # OCB 로 정적 바이너리를 빌드하고 묶는다 (dist/, 커밋 안 함)
-#   dist/cmp-otelcol-<버전>-linux-amd64.tar.gz   bin/cmp-otelcol, systemd/cmp-otelcol.service, install.sh, uninstall.sh, config.yaml.tmpl
-#   dist/cmp-otelcol-<버전>-windows-amd64.zip     cmp-otelcol.exe, install.ps1, uninstall.ps1, config.yaml.tmpl
+make agent-package     # OCB 로 정적 바이너리를 빌드하고 묶는다 (dist/, 커밋 안 함). Go 1.27.2 이상이 필요하다 (Makefile 머리말)
+#   dist/cmp-otelcol-<버전>-linux-amd64.tar.gz   bin/cmp-otelcol, bin/cmp-gpm, systemd/cmp-otelcol.service, install.sh, uninstall.sh, config.yaml.tmpl
+#   dist/cmp-otelcol-<버전>-windows-amd64.zip     cmp-otelcol.exe, install.ps1, uninstall.ps1, config.yaml.tmpl (agent/windows/ 의 것)
 make test              # agent/ 아래 Go 모듈마다 go test
 
 # Linux (SSH). root 가 아니면 sudo 로 돈다
@@ -94,10 +94,11 @@ bin/install-agent.sh --host root@192.0.2.21 --key <pem> --uninstall
 | 인자 | 기본 | 뜻 |
 |---|---|---|
 | `--nodes` | (필수) | 중앙 노드 수집 주소 목록 (쉼표로) |
-| `--interval` | `10s` | 호스트 지표 수집 주기 |
+| `--interval` | `10s` | 호스트 지표(host_metrics) 수집 주기. GPU · NPU(accelerator)는 설정 틀에서 10s 고정 |
 | `--failback` | `1m` | 시작 주소로 돌아가기를 시도하는 간격 |
 | `--tls-verify` | `skip` | 노드 HTTPS 인증서: `skip`(검증 안 함) 또는 `ca`(`--ca <pem>` 의 사설 CA 로 검증) |
 | `--start-key` | 호스트 이름 | 시작 주소를 고를 때 해시할 값 |
+| `--role` | 없음 | `hypervisor` 면 KVM/libvirt 하이퍼바이저 수신기를 켠다 (Linux 만) |
 | `--key` · `--password` | | SSH 키, 또는 비밀번호. 비밀번호는 환경 변수 `AGENT_PASSWORD` 에서, 없으면 프롬프트로 받는다. 파일 · 명령줄 인자에 남기지 않는다 (SSH 는 `sshpass -e`). Windows 는 `--password` 만 된다 |
 
 **대상에 깔리는 것** (다시 돌려도 된다. 바이너리 · 설정 · 서비스를 새것으로 바꾸고 큐는 그대로 둔다)
@@ -114,6 +115,14 @@ bin/install-agent.sh --host root@192.0.2.21 --key <pem> --uninstall
 - **SELinux** (켜져 있을 때): 중앙 노드의 옛 설치처럼 라벨 규칙을 CIL 정책 모듈 `cmp_agent_files` 로 넣는다 (`semodule -i`, `semanage` 가 없는 서버가 있어서). `bin` 은 `bin_t` 라 systemd 가 `unconfined_service_t` 로 띄우고, `conf` `etc_t` · `data` `var_lib_t` · `logs` `var_log_t`, 기준 폴더는 `usr_t`. 다시 라벨링은 우리 폴더에만 한다.
 - `cmpotlp` 는 노드 주소 목록 중 한 곳에만 보낸다. 시작 주소는 호스트 이름(또는 `--start-key`)의 해시로 고르고, 실패하면 다음 주소로, `failback_interval` 마다 시작 주소로 돌아가기를 시도한다 (설계 문서 3.11).
 - 보내기 전에 `file_storage` 디스크 큐(`data`)에 쌓는다.
+- **설정 틀의 흐름** (자세한 것은 `agent/config.yaml.tmpl` 머리말): 지표는 host_metrics(프로세스 포함) · accelerator · otlp 를
+  top10process(CPU 상위 10개와 메모리 상위 10개 프로세스의 합집합만) → resource_detection → resource → batch 로 보내고, gpujoin 이 GPU 표를 배운다.
+  로그는 unifiedlog(Linux journald 우선 · rsyslog, Windows 이벤트 로그) · otlp 를 gpujoin 을 거쳐 보낸다. Windows 트레이스는
+  winpackettrace 를 더하지만 `ports` 가 비어 있어 캡처하지 않는다. exec · vsphere 는 설정 파일에 예시만 있다.
+- **host.id**: 설치 스크립트가 Linux `/sys/class/dmi/id/product_uuid`, Windows `Win32_ComputerSystemProduct.UUID` 를 소문자로 읽어
+  resource 프로세서로 덮어쓴다. 하이퍼바이저 수신기의 `hypervisor.vm.uuid` 와 같은 값이라 VM 과 GPU 할당을 잇는다.
+  못 읽으면(SMBIOS 를 내보이지 않는 VM 등) 넣지 않고 resource 를 파이프라인에서 뺀다.
+- **cmp-gpm**: NVML GPM 을 재는 보조 바이너리 (glibc 동적). 본체를 정적으로 두려고 나눴다. `bin` 에 함께 놓이고 accelerator 가 주기마다 실행한다.
 - **전환 시험**: `checks/agent-failover.sh` 는 1초 샘플이 빠짐없이 있는지 세므로 에이전트를 `--interval 1s` 로 깔고 돌린다. 평상시에 에이전트가 보내는 노드를 찾아 그 노드를 막는다.
 
 ```sh

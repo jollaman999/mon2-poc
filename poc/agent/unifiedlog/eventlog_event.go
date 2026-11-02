@@ -165,6 +165,20 @@ func (f *eventFilters) shouldExcludeEmptyField(field, fieldType string, fieldVal
 	return false
 }
 
+// eventFieldValue 는 원본(Telegraf metric.convertField)처럼 필드에 담을 수 있는 기본형만 돌려주고, 나머지는 nil 이다.
+// System 의 Correlation · Execution · Security 와 UserData · EventData · RenderingInfo 는 구조체라 원본에서도 필드로
+// 들어가지 못하고 빠졌다. 그 안의 값은 ActivityID · UserID · ProcessName 과 process_userdata · process_eventdata 로 따로 낸다.
+// 이것이 없으면 구조체가 "{820 4404 }" 같은 문자열로 속성에 들어간다.
+func eventFieldValue(v any) any {
+	switch x := v.(type) {
+	case string, bool, int, int32, int64, uint32, uint64, float64:
+		return x
+	case []byte:
+		return string(x)
+	}
+	return nil
+}
+
 // decodeUTF16 은 UTF-16LE 바이트를 UTF-8 로 바꾼다.
 func decodeUTF16(b []byte) ([]byte, error) {
 	if len(b)%2 != 0 {

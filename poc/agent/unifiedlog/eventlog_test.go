@@ -185,3 +185,28 @@ func TestEventlogRecord(t *testing.T) {
 	r = eventlogRecord(map[string]string{}, map[string]any{"Level": 1}, ts)
 	eq(t, r.sevNumber, plog.SeverityNumberFatal, "Level 1")
 }
+
+// 구조체 필드(Correlation · Execution · Security · UserData · EventData · RenderingInfo)는 원본처럼 빠지고 기본형만 남는다.
+func TestEventFieldValue(t *testing.T) {
+	ev := event{EventID: 7036, Keywords: "0x8080000000000000", Channel: "System"}
+	ev.Execution.ProcessID = 820
+	ev.EventData.InnerXML = []byte("<Data Name='param1'>x</Data>")
+	keep := map[string]any{}
+	evt := reflect.ValueOf(&ev).Elem()
+	for i := 0; i < evt.NumField(); i++ {
+		if v := eventFieldValue(evt.Field(i).Interface()); v != nil {
+			keep[evt.Type().Field(i).Name] = v
+		}
+	}
+	for _, name := range []string{"Correlation", "Execution", "Security", "UserData", "EventData", "RenderingInfo"} {
+		if v, ok := keep[name]; ok {
+			t.Errorf("%s 가 남았다: %v", name, v)
+		}
+	}
+	if keep["EventID"] != 7036 || keep["Channel"] != "System" || keep["Keywords"] != "0x8080000000000000" {
+		t.Errorf("기본형이 빠졌다: %v", keep)
+	}
+	if got := eventFieldValue([]byte("ab")); got != "ab" {
+		t.Errorf("[]byte -> %v, 기대 문자열", got)
+	}
+}

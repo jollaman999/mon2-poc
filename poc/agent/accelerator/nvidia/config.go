@@ -16,9 +16,12 @@ type Config struct {
 }
 
 // GPMConfig 는 NVML GPM(Hopper 이상, MIG 인스턴스별 사용률) 설정이다.
-// libnvidia-ml 이나 GPM 심볼이 없으면 켜 두어도 조용히 건너뛴다.
+// GPM 은 보조 바이너리 cmp-gpm 을 수집 주기마다 실행해 읽는다. cmp-gpm 이 없거나 실패하거나,
+// libnvidia-ml · GPM 심볼 · 지원 장치가 없으면 켜 두어도 GPM 만 조용히 건너뛴다.
 type GPMConfig struct {
 	Enabled bool `mapstructure:"enabled"`
+	// cmp-gpm 경로. 비우면 에이전트 실행 파일과 같은 폴더, 그다음 PATH 에서 찾는다.
+	BinPath string `mapstructure:"bin_path"`
 	// GPM 샘플 두 개 사이 간격. 이 구간의 평균이 값이 된다. NVML 문서상 100ms 보다 커야 한다.
 	SampleInterval time.Duration `mapstructure:"sample_interval"`
 }

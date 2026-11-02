@@ -305,8 +305,8 @@ func (w *winEventLog) toRecord(event event) record {
 					fieldsUsage[fieldName]++
 				}
 			} else if where == "fields" {
-				if !w.filters.shouldExcludeEmptyField(fieldName, fieldType, fieldValue) {
-					fields[fieldName] = fieldValue
+				if v := eventFieldValue(fieldValue); v != nil && !w.filters.shouldExcludeEmptyField(fieldName, fieldType, v) {
+					fields[fieldName] = v
 					fieldsUsage[fieldName]++
 				}
 			}

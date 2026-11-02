@@ -5,7 +5,7 @@ GPU · NPU 지표를 벤더 도구로 직접 걷는 OTel Collector 수신기(rec
 
 | 백엔드 | 도구 | 상태 |
 |---|---|---|
-| `nvidia` | `nvidia-smi -q -x` (XML), NVML GPM (purego 로 `libnvidia-ml` 을 연다, cgo 없음) | 있음 |
+| `nvidia` | `nvidia-smi -q -x` (XML), NVML GPM (보조 바이너리 `cmp-gpm` 이 purego 로 `libnvidia-ml` 을 연다, cgo 없음) | 있음 |
 | `amd` | `amd-smi metric --json`, `amd-smi static --asic --bus --driver --limit --json` | 있음 |
 | `rebellions` | `rbln-smi -j` | 있음 |
 | `furiosa` | `furiosa-smi-go` v1.0.0 (Apache-2.0, cgo 없음. 바이너리에 넣어 sysfs · devfs 를 직접 읽는다) | 있음 |
@@ -24,7 +24,8 @@ receivers:
       bin_path: ""             # 비우면 PATH, 그다음 OS 기본 위치
       timeout: 5s              # nvidia-smi 한 번 실행의 시간 제한
       gpm:
-        enabled: true          # libnvidia-ml 이나 GPM 심볼이 없으면 조용히 건너뛴다
+        enabled: true          # cmp-gpm · libnvidia-ml · GPM 심볼 · 지원 장치가 없으면 조용히 건너뛴다
+        bin_path: ""           # cmp-gpm 경로. 비우면 에이전트 실행 파일과 같은 폴더, 그다음 PATH
         sample_interval: 1s    # GPM 샘플 두 개 사이. 100ms 보다 크고 collection_interval 보다 작아야 한다
     amd:
       bin_path: ""             # 비우면 PATH, 그다음 /opt/rocm/bin, /usr/bin
@@ -46,6 +47,26 @@ receivers:
 
 nvidia-smi 기본 위치: Linux `/usr/bin`, `/usr/local/bin`. Windows `%ProgramW6432%\NVIDIA Corporation\NVSMI\`,
 `%SystemRoot%\System32\`. NVML GPM 은 Linux 에서만 쓴다 (다른 OS 에서는 GPM 만 꺼진다).
+
+**GPM 보조 바이너리 `cmp-gpm`**: purego 는 `CGO_ENABLED=0` 이어도 libc 에 동적 링크된다. 에이전트 본체(`cmp-otelcol`)를
+정적 바이너리로 두려고 NVML 을 여는 코드를 이 모듈의 `cmd/cmp-gpm` 으로 뺐다. 본체는 `purego` 를 import 하지 않는다.
+nvidia 백엔드는 수집 주기마다 `cmp-gpm -interval <sample_interval>` 을 nvidia-smi 와 겹쳐 실행하고 표준 출력의 JSON
+(`nvidia/gpm` 의 `Output`)을 읽는다. 시간 제한은 `sample_interval + timeout` 이다.
+
+```json
+{"results":[{"uuid":"GPU-...","values":{"nvidia.gpm.graphics.utilization":55}},
+            {"uuid":"GPU-...","mig":true,"gpu_instance_id":3,"values":{"nvidia.gpm.graphics.utilization":12}}]}
+{"results":[],"skipped":"GPM 을 지원하는 장치 · MIG 인스턴스가 없다"}
+```
+
+| 상황 | cmp-gpm | 백엔드 |
+|---|---|---|
+| libnvidia-ml · GPM 심볼이 없음, 지원 장치가 없음 (Hopper 미만, T4 vGPU 게스트) | 종료 0, `results` 빈 배열 + `skipped` | 처음 한 번 디버그 로그, GPM 만 빠짐 |
+| cmp-gpm 이 없음 | - | Start 때 디버그 로그, GPM 을 끈다 |
+| 실행 실패 · 시간 초과 · JSON 아님 | 종료 1 (인자 오류 2) | 처음 한 번 경고, 그 뒤 디버그. 그 주기 GPM 만 빠짐 |
+
+빌드: `CGO_ENABLED=0 go build ./cmd/cmp-gpm` (glibc 동적 실행 파일). Linux 묶음에 들어가 `/cmp-agent/bin` 에 놓인다.
+실행 비용은 T4 vGPU 게스트(GPM 미지원)에서 1회 35ms (CPU 33ms) 였다. 지원 장치가 있으면 `sample_interval` 만큼 더 걸린다.
 
 자동 감지: `amd` 는 amd-smi, `rebellions` 는 rbln-smi 실행 파일이 있으면, `furiosa` 는 `/sys/bus/pci/devices` 에
 Furiosa 벤더 id(0x1ed2) 장치가 있으면 켜진다. 세 백엔드 모두 Linux 만 본다 (Windows 에서는 감지되지 않는다).
@@ -130,7 +151,7 @@ type Sample struct {
 6. 장치 속성은 위의 `hw.id` · `hw.model` · `accelerator.*` 를 쓴다. `vendor` · `source` 는 넣지 않는다 (수신기가 덮어쓴다).
 7. 같은 장치의 Sample 끼리 `Attrs` 맵을 나눠 쓰지 않는다 (`backend.CopyAttrs`). 수신기가 맵에 vendor 를 넣는다.
 8. 시험: 도구의 실제 출력 표본을 `<벤더>/testdata/` 에 두고 파싱 결과를 기대값과 비교한다.
-   도구 실행은 가짜 실행 파일(셸 스크립트)로, 라이브러리는 인터페이스 가짜로 본다 (`nvidia/nvidia_test.go`, `nvidia/gpm_test.go`).
+   도구 실행은 가짜 실행 파일(셸 스크립트)로, 라이브러리는 인터페이스 가짜로 본다 (`nvidia/nvidia_test.go`, `nvidia/gpm/gpm_test.go`).
    라이브러리가 공식 시험 도구를 주면 그것을 쓴다 (`furiosa/furiosa_test.go`).
 
 ## NVIDIA 지표
@@ -421,8 +442,10 @@ go vet ./... && go test ./... && CGO_ENABLED=0 go build ./...
 
 - `nvidia/parse_test.go`: telegraf 시험의 기대값을 그대로 옮겨 13개 XML 표본의 파싱 결과를 비교한다.
 - `nvidia/convert_test.go`: 파서가 낸 필드가 모두 대응표에 있는지, 이름 · 단위 · 공통 이름 값, 이 README 에 모든 이름이 있는지.
-- `nvidia/gpm_test.go`: NVML 을 인터페이스 가짜로 바꿔 장치 단위 · MIG · vGPU 게스트 · NaN 을 본다.
-- `nvidia/nvidia_test.go`: 가짜 `nvidia-smi` 스크립트로 실행 · 실패 · GPM 대체를 본다.
+- `nvidia/gpm/gpm_test.go`: NVML 을 인터페이스 가짜로 바꿔 장치 단위 · MIG · vGPU 게스트 · GPM 미지원 장치 · NaN, JSON 형식을 본다.
+- `nvidia/gpm_test.go`: GPM 값에 nvidia-smi 장치 속성을 붙이고 gpu_util 을 대체하는지.
+- `nvidia/nvidia_test.go`: 가짜 `nvidia-smi` · 가짜 `cmp-gpm` 스크립트로 실행 · 실패 · GPM 대체, cmp-gpm 이 없거나 실패 · JSON 아님 · 건너뜀이면 GPM 만 빠지는지.
+- `cmd/cmp-gpm/main_test.go`: 라이브러리 · 장치가 없을 때 빈 결과와 까닭을 종료 0 으로 내는지, 실제 libnvidia-ml 열기.
 - `amd/convert_test.go`: MI300X DPX `metric --json` 표본(새 형식)과 ROCm 6.1 `metric -p --json` 표본(옛 형식), static 표본의 이름 · 단위 · 공통 이름 값, N/A 는 안 내는지, 단위가 다르면 버리는지, 이 README 에 모든 이름이 있는지.
 - `amd/amd_test.go`: 가짜 `amd-smi` 스크립트로 static 을 static_interval 마다만 부르는지, static · metric 실패를 본다.
 - `rebellions/rebellions_test.go`: 공식 문서의 `rbln-smi -j` 표본 두 개(ATOM CA25, REBEL100 CR13)와 가짜 `rbln-smi` 스크립트.

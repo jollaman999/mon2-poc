@@ -1,10 +1,14 @@
-package nvidia
+package main
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/jollaman999/mon2-poc/agent/accelerator/nvidia/gpm"
+)
 
 // libnvidia-ml 바인딩. cgo 를 쓰지 않고 purego 로 dlopen · dlsym 한다 (nvml_linux.go).
-// 에이전트는 CGO_ENABLED=0 정적 빌드라 C 라이브러리를 링크할 수 없다. purego 는 실행 중에 심볼을 찾으므로
-// 정적 빌드를 지키면서 NVML 을 부를 수 있고, 라이브러리가 없는 호스트에서는 열기 실패로 조용히 꺼진다.
+// purego 는 CGO_ENABLED=0 이어도 libc 에 동적 링크되므로, 정적이어야 하는 에이전트 본체에 넣지 않고
+// 이 보조 바이너리에만 둔다. 라이브러리가 없는 호스트에서는 열기 실패로 조용히 건너뛴다.
 
 const (
 	nvmlSuccess = 0
@@ -40,7 +44,7 @@ type gpmMetricsGet struct {
 
 var errNVMLUnavailable = errors.New("libnvidia-ml 을 열 수 없다")
 
-// nvml 은 purego 로 연 함수들이다. gpmLib 을 구현한다.
+// nvml 은 purego 로 연 함수들이다. gpm.Lib 을 구현한다.
 type nvml struct {
 	handle uintptr
 
@@ -59,19 +63,19 @@ type nvml struct {
 	gpmMetricsGet             func(*gpmMetricsGet) int32
 }
 
-var _ gpmLib = (*nvml)(nil)
+var _ gpm.Lib = (*nvml)(nil)
 
-func (n *nvml) deviceCount() (uint32, bool) {
+func (n *nvml) DeviceCount() (uint32, bool) {
 	var c uint32
 	return c, n.deviceGetCount(&c) == nvmlSuccess
 }
 
-func (n *nvml) deviceHandle(i uint32) (uintptr, bool) {
+func (n *nvml) DeviceHandle(i uint32) (uintptr, bool) {
 	var d uintptr
 	return d, n.deviceGetHandleByIndex(i, &d) == nvmlSuccess
 }
 
-func (n *nvml) uuid(dev uintptr) string {
+func (n *nvml) UUID(dev uintptr) string {
 	buf := make([]byte, 96)
 	if n.deviceGetUUID(dev, &buf[0], uint32(len(buf))) != nvmlSuccess {
 		return ""
@@ -83,7 +87,7 @@ func (n *nvml) uuid(dev uintptr) string {
 	return string(buf[:end])
 }
 
-func (n *nvml) gpuInstanceIDs(dev uintptr) []uint32 {
+func (n *nvml) GPUInstanceIDs(dev uintptr) []uint32 {
 	var count uint32
 	if n.deviceGetMaxMigDeviceCnt(dev, &count) != nvmlSuccess {
 		return nil
@@ -102,20 +106,20 @@ func (n *nvml) gpuInstanceIDs(dev uintptr) []uint32 {
 	return ids
 }
 
-func (n *nvml) sampleAlloc() (uintptr, bool) {
+func (n *nvml) SampleAlloc() (uintptr, bool) {
 	var s uintptr
 	return s, n.gpmSampleAlloc(&s) == nvmlSuccess
 }
 
-func (n *nvml) sampleFree(s uintptr) { n.gpmSampleFree(s) }
+func (n *nvml) SampleFree(s uintptr) { n.gpmSampleFree(s) }
 
-func (n *nvml) sampleGet(dev, s uintptr) bool { return n.gpmSampleGet(dev, s) == nvmlSuccess }
+func (n *nvml) SampleGet(dev, s uintptr) bool { return n.gpmSampleGet(dev, s) == nvmlSuccess }
 
-func (n *nvml) migSampleGet(dev uintptr, gi uint32, s uintptr) bool {
+func (n *nvml) MigSampleGet(dev uintptr, gi uint32, s uintptr) bool {
 	return n.gpmMigSampleGet(dev, gi, s) == nvmlSuccess
 }
 
-func (n *nvml) metrics(s1, s2 uintptr, ids []uint32) ([]gpmValue, bool) {
+func (n *nvml) Metrics(s1, s2 uintptr, ids []uint32) ([]gpm.Value, bool) {
 	if len(ids) > gpmMetricMax {
 		return nil, false
 	}
@@ -130,21 +134,21 @@ func (n *nvml) metrics(s1, s2 uintptr, ids []uint32) ([]gpmValue, bool) {
 	if n.gpmMetricsGet(&mg) != nvmlSuccess {
 		return nil, false
 	}
-	out := make([]gpmValue, len(ids))
+	out := make([]gpm.Value, len(ids))
 	for i := range ids {
 		m := mg.metrics[i]
-		out[i] = gpmValue{ok: m.nvmlReturn == nvmlSuccess, value: m.value}
+		out[i] = gpm.Value{OK: m.nvmlReturn == nvmlSuccess, Value: m.value}
 	}
 	return out, true
 }
 
-func (n *nvml) shutdown() {
+func (n *nvml) Shutdown() {
 	n.shutdownFn()
 	n.close()
 }
 
-// openGPM 은 NVML 을 열고 초기화한다. 없거나 실패하면 에러를 돌려주고, 호출부는 GPM 을 끈다.
-func openGPM() (gpmLib, error) {
+// openGPM 은 NVML 을 열고 초기화한다. 없거나 실패하면 에러를 돌려주고, 호출부는 GPM 을 건너뛴다.
+func openGPM() (gpm.Lib, error) {
 	n, err := loadNVML()
 	if err != nil {
 		return nil, err

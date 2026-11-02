@@ -2,12 +2,15 @@
 # 에이전트(cmp-otelcol)를 이 호스트에 서비스로 설치한다. 묶음(cmp-otelcol-<버전>-linux-amd64)을 푼 폴더에서 root 로 돌린다.
 # 다시 돌려도 된다: 바이너리 · 설정 · 유닛을 새것으로 바꾸고 서비스를 다시 띄운다. 큐(data)는 그대로 둔다.
 # 사용: install.sh --nodes https://A:4318,https://B:4318 [--interval 10s] [--failback 1m]
-#                  [--tls-verify skip|ca] [--ca <사설 CA pem>] [--start-key <값>]
+#                  [--tls-verify skip|ca] [--ca <사설 CA pem>] [--start-key <값>] [--role hypervisor]
 #   --nodes       중앙 노드 수집 주소 목록 (쉼표로). 평소에는 한 곳에만 보내고 실패하면 다음 주소로 넘어간다
 #   --interval    호스트 지표 수집 주기 (기본 10s)
 #   --failback    시작 주소로 돌아가기를 시도하는 간격 (기본 1m)
 #   --tls-verify  노드 HTTPS 인증서: skip(검증 안 함, 기본) 또는 ca(--ca 로 준 사설 CA 로 검증)
 #   --start-key   시작 주소를 고를 때 해시할 값 (기본 호스트 이름)
+#   --role        hypervisor 면 KVM/libvirt 하이퍼바이저 수신기(GPU-VM 매핑 · vGPU · OVS)를 켠다. 기본은 없음
+# host.id 는 /sys/class/dmi/id/product_uuid(소문자)로 덮어쓴다. 하이퍼바이저가 보는 VM uuid 와 같은 값이다. 못 읽으면 넣지 않는다.
+# exec · vsphere 수신기는 설정 파일(conf/config.yaml)에 예시만 있다. 고쳐서 켠다.
 # 기준 폴더 /cmp-agent 아래: bin(실행 파일) · conf(설정) · data(file_storage 디스크 큐) · logs(에이전트 로그)
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -16,7 +19,7 @@ BASE_DIR=/cmp-agent
 BIN_DIR=$BASE_DIR/bin CONF_DIR=$BASE_DIR/conf DATA_DIR=$BASE_DIR/data LOG_DIR=$BASE_DIR/logs
 SELINUX_MODULE=cmp_agent_files
 
-nodes="" interval=10s failback=1m tls_verify=skip ca="" start_key=""
+nodes="" interval=10s failback=1m tls_verify=skip ca="" start_key="" role=""
 while [ $# -gt 0 ]; do
   case $1 in
     --nodes)      nodes=${2:?}; shift 2 ;;
@@ -25,12 +28,13 @@ while [ $# -gt 0 ]; do
     --tls-verify) tls_verify=${2:?}; shift 2 ;;
     --ca)         ca=${2:?}; shift 2 ;;
     --start-key)  start_key=${2:?}; shift 2 ;;
+    --role)       role=${2:?}; shift 2 ;;
     *) echo "모르는 인자: $1" >&2; exit 1 ;;
   esac
 done
 [ "$(id -u)" = 0 ] || { echo "root 로 돌린다" >&2; exit 1; }
 [ -n "$nodes" ] || { echo "--nodes 가 필요하다 (예: https://192.0.2.11:4318,https://192.0.2.12:4318)" >&2; exit 1; }
-for f in bin/$NAME systemd/$NAME.service config.yaml.tmpl uninstall.sh; do
+for f in bin/$NAME bin/cmp-gpm systemd/$NAME.service config.yaml.tmpl uninstall.sh; do
   [ -f "$f" ] || { echo "묶음에 $f 가 없다. 묶음을 푼 폴더에서 돌린다" >&2; exit 1; }
 done
 # 쉼표 목록 → YAML 목록 안의 "주소", "주소"
@@ -46,6 +50,18 @@ case $tls_verify in
         tls_line="ca_file: $CONF_DIR/ca.pem" ;;
   *)    echo "--tls-verify 는 skip 또는 ca: $tls_verify" >&2; exit 1 ;;
 esac
+case $role in
+  "")         role_receivers="" ;;
+  hypervisor) role_receivers=", hypervisor" ;;
+  *)          echo "--role 은 hypervisor 만 된다: $role" >&2; exit 1 ;;
+esac
+# VM 이면 하이퍼바이저가 붙인 uuid 다. 형식이 uuid 가 아니면(빈 값, 권한 없음) 넣지 않는다
+host_id=$(tr '[:upper:]' '[:lower:]' </sys/class/dmi/id/product_uuid 2>/dev/null || true)
+if [[ $host_id =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+  host_id_proc=", resource"
+else
+  host_id="" host_id_proc=""
+fi
 
 echo "[1/6] 폴더"
 # 기준 폴더는 다른 것과 같이 쓸 수 있으므로 우리 하위 폴더만 만든다
@@ -54,8 +70,11 @@ install -d -m 0700 "$DATA_DIR"
 
 echo "[2/6] 실행 파일"
 # 돌고 있는 실행 파일을 덮어쓰지 않도록 옆에 복사한 뒤 바꿔 끼운다 (서비스는 6단계에서 다시 띄운다)
-install -m 0755 "bin/$NAME" "$BIN_DIR/.$NAME.new"
-mv -f "$BIN_DIR/.$NAME.new" "$BIN_DIR/$NAME"
+# cmp-gpm 은 NVML GPM 을 재는 보조 바이너리다. accelerator 가 수집 주기마다 이 폴더에서 찾아 실행한다
+for b in "$NAME" cmp-gpm; do
+  install -m 0755 "bin/$b" "$BIN_DIR/.$b.new"
+  mv -f "$BIN_DIR/.$b.new" "$BIN_DIR/$b"
+done
 install -m 0755 uninstall.sh "$BIN_DIR/uninstall.sh"
 "$BIN_DIR/$NAME" --version
 
@@ -63,11 +82,12 @@ echo "[3/6] 설정"
 [ "$tls_verify" = ca ] && install -m 0644 "$ca" "$CONF_DIR/ca.pem"
 sed -e "s|@QUEUE_DIR@|$DATA_DIR|" -e "s|@INTERVAL@|$interval|" -e "s|@ENDPOINTS@|$endpoints|" \
     -e "s|@START_KEY@|$start_key|" -e "s|@FAILBACK@|$failback|" -e "s|@TLS@|$tls_line|" \
-    -e "s|@LOG_FILE@|$LOG_DIR/$NAME.log|g" config.yaml.tmpl > "$CONF_DIR/.config.yaml.new"
+    -e "s|@LOG_FILE@|$LOG_DIR/$NAME.log|g" -e "s|@HOST_ID@|$host_id|" -e "s|@HOST_ID_PROC@|$host_id_proc|g" \
+    -e "s|@ROLE_RECEIVERS@|$role_receivers|" config.yaml.tmpl > "$CONF_DIR/.config.yaml.new"
 chmod 0640 "$CONF_DIR/.config.yaml.new"
 "$BIN_DIR/$NAME" validate --config "$CONF_DIR/.config.yaml.new"
 mv -f "$CONF_DIR/.config.yaml.new" "$CONF_DIR/config.yaml"
-echo "노드 $nodes, 수집 주기 $interval, 돌아가기 $failback, TLS $tls_verify"
+echo "노드 $nodes, 수집 주기 $interval, 돌아가기 $failback, TLS $tls_verify, host.id ${host_id:-(없음)}, 역할 ${role:-(없음)}"
 
 echo "[4/6] SELinux 라벨"
 # semanage(policycoreutils-python-utils)는 없는 서버가 있다. 그래서 라벨 규칙을 CIL 정책 모듈로 만들어
@@ -89,7 +109,7 @@ CIL
   # 기준 폴더 안의 다른 것은 건드리지 않도록 우리 폴더만 다시 라벨링한다
   restorecon "$BASE_DIR"
   restorecon -R "$BIN_DIR" "$CONF_DIR" "$DATA_DIR" "$LOG_DIR"
-  ls -dZ "$BASE_DIR" "$BIN_DIR/$NAME" "$CONF_DIR" "$DATA_DIR" "$LOG_DIR"
+  ls -dZ "$BASE_DIR" "$BIN_DIR/$NAME" "$BIN_DIR/cmp-gpm" "$CONF_DIR" "$DATA_DIR" "$LOG_DIR"
 else
   echo "SELinux 꺼짐 또는 없음"
 fi

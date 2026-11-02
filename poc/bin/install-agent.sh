@@ -3,6 +3,7 @@
 # 사용: bin/install-agent.sh --host <user@ip> [--jump <user@host>] [--key <pem> | --password]
 #                            --nodes https://A:4318,https://B:4318 [--os linux|windows]
 #                            [--interval 10s] [--failback 1m] [--tls-verify skip|ca] [--ca <pem>] [--start-key <값>]
+#                            [--role hypervisor]   (linux 만. KVM/libvirt 하이퍼바이저 수신기를 켠다)
 #       bin/install-agent.sh --host <user@ip> [--jump ...] [--key <pem> | --password] [--os ...] --uninstall [--purge]
 #   linux    SSH 로 묶음을 올리고(scp) install.sh 를 root 로 돌린다 (root 가 아니면 sudo)
 #   windows  WinRM(HTTPS 5986, 사설 인증서라 검증 안 함)으로 묶음을 올리고 install.ps1 을 돌린다. --password 가 필요하다.
@@ -24,7 +25,7 @@ while [ $# -gt 0 ]; do
     --os)         os=${2:?}; shift 2 ;;
     --uninstall)  action=uninstall; shift ;;
     --purge)      purge=1; shift ;;
-    --nodes|--interval|--failback|--tls-verify|--ca|--start-key)
+    --nodes|--interval|--failback|--tls-verify|--ca|--start-key|--role)
                   inst_args+=("$1" "${2:?}"); shift 2 ;;
     *) echo "모르는 인자: $1 (사용법은 이 파일 머리말)" >&2; exit 1 ;;
   esac
@@ -34,6 +35,9 @@ user=${host%@*} ip=${host#*@}
 case $os in linux|windows) ;; *) echo "--os 는 linux 또는 windows: $os" >&2; exit 1 ;; esac
 [ -n "$key" ] && [ -n "$ask_secret" ] && { echo "--key 와 --password 중 하나만 준다" >&2; exit 1; }
 [ "$os" = windows ] && [ -z "$ask_secret" ] && { echo "windows 는 --password 가 필요하다 (WinRM)" >&2; exit 1; }
+if [ "$os" = windows ] && [ ${#inst_args[@]} -gt 0 ] && printf '%s\n' "${inst_args[@]}" | grep -qx -- --role; then
+  echo "--role 은 linux 만 된다 (하이퍼바이저 수신기는 KVM/libvirt)" >&2; exit 1
+fi
 if [ "$action" = install ]; then
   printf '%s\n' "${inst_args[@]}" | grep -qx -- --nodes || { echo "--nodes 가 필요하다" >&2; exit 1; }
 fi

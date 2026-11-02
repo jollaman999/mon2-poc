@@ -270,13 +270,18 @@ accelerator 수신기의 GPM 지표(`nvidia.gpm.*`)가 (`hw.id` = `hw.parent`, `
 - 같은 도메인의 qemu 명령줄이 `-uuid <도메인 uuid>` 와 `-smbios type=1,...,serial=<도메인 uuid>,uuid=<도메인 uuid>` 다.
   게스트 펌웨어가 받는 SMBIOS Type 1 UUID 가 도메인 uuid 라는 뜻이다.
 
-그래서 게스트에서 읽히는 값은 Linux `/sys/class/dmi/id/product_uuid` (root 만 읽힌다, 소문자),
-Windows `Win32_ComputerSystemProduct.UUID` (대문자) 다. 게스트 안에서 직접 읽어 비교하지는 않았다 (점프 호스트 밖 접속은 이번 작업 범위 밖).
+게스트에서 읽히는 값은 Linux `/sys/class/dmi/id/product_uuid` (root 만 읽힌다, 소문자),
+Windows `Win32_ComputerSystemProduct.UUID` (대문자) 다.
 
-**게스트 에이전트의 `host.id` 는 지금 이 값이 아니다.** `resourcedetection` 의 `system` 감지기는 OTel SDK 의 host id 를 쓰는데,
-Linux 는 `/etc/machine-id` → `/var/lib/dbus/machine-id`, Windows 는 레지스트리 `MachineGuid` 를 읽는다 (SDK v1.47.0 `resource/host_id*.go`).
-machine-id 는 OS 설치 때 만든 값이라 도메인 uuid 와 다르다. 이을 수 있게 하려면 게스트 에이전트에서 `host.id` 를
-SMBIOS uuid 를 소문자로 바꾼 값으로 덮어써야 한다 (예: 설치 스크립트가 `product_uuid` 를 읽어 `resource` 프로세서의 `host.id` 에 upsert).
+`resourcedetection` 의 `system` 감지기가 주는 `host.id` 는 machine-id(Windows 는 `MachineGuid`)라 도메인 uuid 와 다르다.
+그래서 **에이전트 설치 스크립트(`poc/agent/install.sh`, `windows/install.ps1`)가 SMBIOS uuid 를 소문자로 읽어
+`resource` 프로세서로 `host.id` 를 덮어쓴다.** 값을 읽지 못하면 넣지 않는다.
+
+PoC 확인 (2026-11-02):
+- .73(Linux, KVM 게스트): 설정의 `host.id` 와 `product_uuid` 가 같다. 지표 · 로그 모두에 붙는다.
+- 노드 A(Rocky 10, OpenStack 인스턴스): `host.id` 가 `openstack server show` 의 id 와 같다.
+- .162(Windows Server 2025): Windows 가 SMBIOS 를 보지 못해(`Win32_ComputerSystemProduct` 0개, `SMBIOSPresent` False) `host.id` 를 넣지 못했다. 이 VM 은 아직 하이퍼바이저 지표와 이을 수 없다 (원인 확인 필요).
+
 그러면 다음 둘이 같은 vGPU 다.
 
 | 하이퍼바이저 쪽 | 게스트 쪽 |
