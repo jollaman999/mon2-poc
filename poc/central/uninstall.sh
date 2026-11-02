@@ -13,6 +13,8 @@ for s in $SERVICES; do
   systemctl disable --now "$NAME-$s" 2>/dev/null || true
   rm -f "/etc/systemd/system/$NAME-$s.service"
 done
+systemctl disable --now "$NAME-reconcile.timer" 2>/dev/null || true
+rm -f "/etc/systemd/system/$NAME-reconcile.timer" "/etc/systemd/system/$NAME-reconcile.service"
 systemctl daemon-reload
 
 if command -v selinuxenabled >/dev/null && selinuxenabled; then

@@ -1,0 +1,11 @@
+[Unit]
+Description=@NAME@ 주기 대조 (메트릭, 상대 노드에만 있는 구간을 복사)
+After=network-online.target @NAME@-victoria-metrics.service
+
+[Service]
+Type=oneshot
+User=@USER@
+Group=@GROUP@
+ExecStart=@BIN@/reconcile-metrics.sh @CONF@
+StandardOutput=append:@LOGS@/reconcile.log
+StandardError=append:@LOGS@/reconcile.log

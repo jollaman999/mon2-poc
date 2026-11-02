@@ -15,11 +15,13 @@
 | `central/conf/` | Alertmanager 설정, vmalert 규칙, 자체 감시 scrape |
 | `central/gen-gateway.sh` | vmauth 입구 설정(경로 · 토큰)을 만든다 |
 | `central/uninstall.sh` | 지우기 (`bin/deploy-central.sh uninstall`) |
+| `central/reconcile-metrics.sh` | 주기 대조(메트릭). 두 노드의 1분 단위 샘플 수를 비교해 상대에만 있는 분을 복사한다. `cmp-mon-reconcile.timer` 가 5분마다 돌린다 (이중화일 때만) |
 | `agent/` | 에이전트 `cmp-otelcol`. `cmpotlp/` 는 주소 목록 출력(Go), `builder-config.yaml` 은 OCB 부품 목록, `build.sh` 가 정적 바이너리를 만든다, `run-poc.sh` 는 시험용으로 한 호스트에 띄운다 |
 | `checks/central-health.sh` | 서비스 상태 · 포트 응답 · SELinux 거부(AVC)를 본다 |
 | `checks/failover.sh` · `failover-suite.sh` | 중앙 노드 장애 시험 (중계 정지 · 노드 정지 · 노드 사이 차단) |
 | `checks/crash-test.sh` · `gen-load.py` | 갑자기 죽였을 때 잃는 양 (중계 `kill -9`, 노드 강제 재시작) |
 | `checks/agent-failover.sh` | 에이전트 전환 · 복귀 시험 (노드 B 입구 정지, 노드 B 로 가는 길 차단) |
+| `checks/reconcile-test.sh` | 주기 대조 시험 (노드 B 저장소 `kill -9` 로 빈틈을 만들고 메워지는지) |
 
 ## 중앙 노드에 깔리는 것
 
@@ -32,6 +34,7 @@
 | vmagent · vlagent · vtagent | `cmp-mon-vmagent` 등 | 127.0.0.1:8429 · 9429 · 10429 |
 | vmalert | `cmp-mon-vmalert` | 127.0.0.1:8880 |
 | Alertmanager | `cmp-mon-alertmanager` | 127.0.0.1:9093, 노드 IP:9094 |
+| 주기 대조 | `cmp-mon-reconcile.timer` (5분마다) | 상대 노드 :7443/vm 을 읽는다 |
 
 **이름 · 경로 · 계정** (`inventory.env`, 비우면 기본값)
 

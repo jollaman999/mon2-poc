@@ -49,7 +49,7 @@ make_secrets() {
 deploy_one() { # self peer
   local self=$1 peer=$2 bundle
   bundle=$(mktemp -d)
-  cp -r central/conf central/systemd central/install.sh central/gen-gateway.sh versions.env "$bundle/"
+  cp -r central/conf central/systemd central/install.sh central/gen-gateway.sh central/reconcile-metrics.sh versions.env "$bundle/"
   mkdir -p "$bundle/secrets"
   cp secrets/ca.pem secrets/server.pem secrets/server.key secrets/peer.token secrets/query.token "$bundle/secrets/"
   mkdir -p "$bundle/dist"

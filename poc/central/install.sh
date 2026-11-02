@@ -50,6 +50,7 @@ for b in victoria-metrics-prod vmagent-prod vmalert-prod vmauth-prod vmctl-prod 
   install -m 0755 "$tmp/$b" "$BIN_DIR/"
 done
 install -m 0755 "$tmp"/alertmanager-*/alertmanager "$tmp"/alertmanager-*/amtool "$BIN_DIR/"
+install -m 0755 reconcile-metrics.sh "$BIN_DIR/"
 
 echo "[3/7] SELinux 라벨"
 # semanage(policycoreutils-python-utils)는 없는 서버가 있다. 그래서 라벨 규칙을 CIL 정책 모듈로 만들어
@@ -110,6 +111,7 @@ umask 027
 cat > "$CONF_DIR/env" <<ENV
 MODE=$MODE
 SELF=$SELF
+TLS_VERIFY=$TLS_VERIFY
 PEER=${PEER:-}
 RETENTION=$RETENTION
 QUEUE_MAX=$QUEUE_MAX
@@ -156,6 +158,12 @@ for s in $SERVICES; do
       -e "s|@BIN@|$BIN_DIR|g" -e "s|@CONF@|$CONF_DIR|g" -e "s|@DATA@|$DATA_DIR|g" -e "s|@LOGS@|$LOG_DIR|g" \
       "systemd/$s.service.tmpl" > "/etc/systemd/system/$NAME-$s.service"
 done
+# 주기 대조 (이중화일 때만 켠다)
+for u in reconcile.service reconcile.timer; do
+  sed -e "s|@NAME@|$NAME|g" -e "s|@USER@|$SERVICE_USER|g" -e "s|@GROUP@|$SERVICE_GROUP|g" \
+      -e "s|@BIN@|$BIN_DIR|g" -e "s|@CONF@|$CONF_DIR|g" -e "s|@LOGS@|$LOG_DIR|g" \
+      "systemd/$u.tmpl" > "/etc/systemd/system/$NAME-$u"
+done
 # 로그 파일은 logrotate 로 돌린다 (서비스가 파일을 계속 열고 있으므로 copytruncate)
 cat > "/etc/logrotate.d/$NAME" <<ROT
 $LOG_DIR/*.log {
@@ -172,6 +180,11 @@ for s in $SERVICES; do
   systemctl enable "$NAME-$s" >/dev/null 2>&1
   systemctl restart "$NAME-$s"
 done
+if [ "$MODE" = ha ]; then
+  systemctl enable --now "$NAME-reconcile.timer" >/dev/null 2>&1
+else
+  systemctl disable --now "$NAME-reconcile.timer" >/dev/null 2>&1 || true
+fi
 
 echo "[7/7] 방화벽"
 if systemctl is-active --quiet firewalld; then
