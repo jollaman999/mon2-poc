@@ -36,3 +36,17 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## purego (The Ebitengine Authors, Apache License 2.0)
+
+`accelerator` 의 NVML GPM 보조 바이너리 `cmp-gpm`(`accelerator/cmd/cmp-gpm`)에 `github.com/ebitengine/purego` v0.10.2 가 들어간다.
+C 컴파일러 없이 `libnvidia-ml` 을 열어 부르는 데 쓴다. 에이전트 본체 `cmp-otelcol` 에는 들어가지 않는다.
+
+- 출처: https://github.com/ebitengine/purego
+- 저작권: Copyright The Ebitengine Authors. 일부 파일은 Copyright The Go Authors (각 파일 머리에 BSD-style 라이선스로 적혀 있다)
+- 라이선스: Apache License 2.0. 전문은 이 저장소 루트의 `LICENSE` 와 같다.
+
+## 기존 관리 서버 스크립트
+
+`hypervisor` 는 기존 관리 서버가 하이퍼바이저에서 돌리던 셸 스크립트 두 개(GPU-VM 매핑, 하이퍼바이저 IP)의 판단 규칙을
+이 저장소 작성자가 Go 로 옮긴 것이다.

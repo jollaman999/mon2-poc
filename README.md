@@ -14,15 +14,15 @@
 |---|---|
 | 무엇을 만드나 | 노드 2대가 똑같은 일을 하는 모니터링 백엔드. 메트릭은 VictoriaMetrics, 로그는 VictoriaLogs, 트레이스는 VictoriaTraces |
 | 양쪽 저장소는 어떻게 같아지나 | 노드마다 있는 **Victoria 중계 에이전트(vmagent · vlagent · vtagent)가 양쪽 저장소에 똑같이 기록**한다. 한쪽이 죽으면 그쪽 몫을 디스크에 쌓았다가 돌아오면 보낸다 (4절) |
-| 에이전트는 | **OCB 로 만든 커스텀 OpenTelemetry Collector** 하나. 공식 부품에 없는 기능(GPU · NPU 수집, 로그 원천 자동 선택, Windows 패킷 트레이스, vSphere, 노드 전환 출력)은 자체 부품으로 만든다 (3.5, 8절) |
+| 에이전트는 | **OCB 로 만든 커스텀 OpenTelemetry Collector** 하나. 공식 부품에 없는 기능(GPU · NPU 수집, 로그 원천 자동 선택, Windows 패킷 트레이스, vSphere, 하이퍼바이저의 GPU-VM 매핑, 노드 전환 출력)은 자체 부품으로 만든다 (3.5, 8절) |
 | 중계를 OTel Collector 가 아니라 Victoria 에이전트로 하는 이유 | 기존 Prometheus(remote_write · scrape)와 Influx · Loki 형식 수집기를 받는 입구가 **Victoria 쪽에서는 기본 기능이고 OTel 쪽에서는 alpha** 다. 큐를 바이트 단위로 보고 남은 양으로 조회 복귀를 정하는 공식 HA 절차가 있다 (3.4) |
 | VIP 는 | **쓰지 않는다.** VIP 는 같은 L2 대역 안에서만 넘어간다. 대신 **에이전트가 노드 주소를 모두 알고, 그중 한 곳에만** 보낸다. 시작 주소는 호스트 이름으로 정해 에이전트마다 나뉘고, 실패하면 목록의 다음 주소로 보낸다. 노드마다 입구 프록시(vmauth)가 있어 로컬 부품이 죽으면 상대 노드로 넘긴다 (3.3, 3.10) |
 | 에이전트가 양쪽에 직접 보내지 않는 이유 | 양쪽이 같은 내용을 가지려면 어느 방식이든 노드마다 전체를 받는다. 에이전트가 양쪽에 보내면 서버 수만큼 송신량이 2배가 되고, 중앙이 복제하면 같은 데이터센터 안의 노드 사이 트래픽으로 끝난다 (3.11) |
 | 노드는 몇 대 | **2대로 시작한다.** 로드밸런서 전용 노드도, split-brain 판정 노드도 없다 (3.9). 한 대의 디스크 · 메모리 한계에 닿으면 입구 · 저장 · 조회를 층으로 나누고 저장을 여러 대에 나눠 담는다. 에이전트는 주소 목록만 바뀐다 (3.12) |
 | 알림은 | **Victoria 계열.** 노드마다 vmalert, Alertmanager 두 대가 클러스터. Grafana 는 쓰지 않는다 (3.8) |
 | Prometheus 와는 | 수집(remote_write 1.0 · OTLP), 조회(Prometheus HTTP API · PromQL), 규칙(Prometheus 형식), Alertmanager 가 그대로 맞는다. 관리 서버가 **두 저장소가 함께 지원하는 것만** 쓰면 메트릭 저장소를 Prometheus ↔ VictoriaMetrics 로 주소만 바꿔 오갈 수 있다 (9절) |
-| AI 반도체는 | 에이전트 안의 수신기가 **벤더 도구를 직접 읽는다.** NVIDIA 는 nvidia-smi + NVML GPM, AMD 는 `amd-smi --json`, Rebellions 는 `rbln-smi -j`, Furiosa 는 순수 Go 라이브러리. **exporter 컨테이너 · podman · nvidia-container-toolkit 이 필요 없다** (3.6) |
-| OS · SELinux | **CGO 를 끈 정적 바이너리 하나**(OCB 기본값). 컨테이너가 없어 SELinux 장치 라벨 문제가 없다. 라벨은 `semanage fcontext` 로 등록한다 (8.3) |
+| AI 반도체는 | 에이전트 안의 수신기가 **벤더 도구를 직접 읽는다.** NVIDIA 는 nvidia-smi + NVML GPM(보조 바이너리 `cmp-gpm`), AMD 는 `amd-smi --json`, Rebellions 는 `rbln-smi -j`, Furiosa 는 순수 Go 라이브러리. **exporter 컨테이너 · podman · nvidia-container-toolkit 이 필요 없다** (3.6) |
+| OS · SELinux | **CGO 를 끈 정적 바이너리 하나**(OCB 기본값). NVML GPM 을 여는 부분만 glibc 동적 보조 바이너리(`cmp-gpm`)로 뺐다 (3.6). 컨테이너가 없어 SELinux 장치 라벨 문제가 없다. 라벨은 CIL 정책 모듈로 넣는다 (8.3) |
 
 ---
 
@@ -37,7 +37,7 @@
 | R5 | AI 반도체(NVIDIA · AMD · NPU) 수집 | 에이전트 수신기가 벤더 CLI · 라이브러리를 직접 읽는다 |
 | R6 | 저장소 · 중계 · 알림은 Victoria 계열, Prometheus · OTel 과 호환 | 14.1 호환표, 9절 |
 | R7 | 메트릭 · 로그(journald · syslog · Windows 이벤트 로그) · 트레이스(eBPF · Windows) · vSphere | 에이전트 하나 + 중앙 vSphere 수집기 |
-| R8 | OS 와 SELinux 에 상관없이 도는 에이전트 | 정적 바이너리 하나, 컨테이너 없음 |
+| R8 | OS 와 SELinux 에 상관없이 도는 에이전트 | 정적 바이너리 하나(GPM 만 보조 바이너리), 컨테이너 없음 |
 | R9 | Grafana 없이 | 알림은 vmalert · Alertmanager, 화면은 관리 서버 |
 | R10 | 나중에 Prometheus ↔ Victoria 를 오갈 수 있게 | 두 저장소의 공통 API 만 쓰는 조회 구조 (9.2) |
 
@@ -196,14 +196,31 @@
 |---|---|---|
 | 서버에 더 까는 것 | 컨테이너 런타임 + nvidia-container-toolkit(최소 `-base`), 또는 DCGM 패키지(추천 패키지를 따라 openmpi · CUDA 라이브러리까지 끌어온다) | **없음.** nvidia-smi 와 libnvidia-ml 은 드라이버에 들어 있다 |
 | 런타임 영향 | toolkit 이 컨테이너 런타임 설정을 바꾼다. `--gpus` 방식은 docker 재시작이 필요하다 | 없음 |
-| vGPU | NVIDIA 문서상 호스트 · 게스트 모두 미지원 | 게스트는 nvidia-smi 일부 지표, 하이퍼바이저는 NVML GPM 으로 MIG 기반 vGPU 사용률 |
+| vGPU | NVIDIA 문서상 호스트 · 게스트 모두 미지원 | 게스트는 nvidia-smi 일부 지표 (PoC 의 T4 vGPU 게스트에서 40개). 하이퍼바이저는 hypervisor 수신기가 `nvidia-smi vgpu -q` 로 vGPU 마다 (8.5), MIG 기반 vGPU 사용률은 NVML GPM |
 | MIG | 지원 | GPM 으로 MIG 인스턴스별 (Hopper 이상). nvidia-smi 의 사용률 조회는 MIG 에서 미지원 |
 | Windows | 문서에 apt · dnf 설치만 있다 (확인 필요) | nvidia-smi 지원. GPM 은 Windows 미지원 |
-| OS · SELinux | 컨테이너가 `/dev/nvidia*` 를 열려면 SELinux 에서 `label=disable` 이나 `nvidia-container-selinux` 가 필요하다 | 정적 바이너리가 실행만 한다 |
+| OS · SELinux | 컨테이너가 `/dev/nvidia*` 를 열려면 SELinux 에서 `label=disable` 이나 `nvidia-container-selinux` 가 필요하다 | 에이전트가 nvidia-smi 와 보조 바이너리 `cmp-gpm` 을 실행만 한다 |
 | 지표 깊이 | 프로파일 지표(`DCGM_FI_PROF_*`, Volta 이상), NVLink, 행 재매핑, 프로세스별 | nvidia-smi 로 사용률 · 메모리 · 온도 · 전력 · ECC · PCIe replay · 클럭 사유 · vGPU 라이선스. **GPM 은 Hopper 이상만**이라 Ampere(A100) 이하에서는 프로파일 지표(텐서 · DRAM 실가동률)를 잃는다 |
 | 유지보수 | NVIDIA 가 유지. DCGM ↔ exporter 버전 짝 관리 | 우리 코드. nvidia-smi XML 스키마 버전 대응이 필요하다 |
 
 **결정**: **nvidia-smi + GPM 을 기본**으로 한다. GPU Operator 처럼 dcgm-exporter 가 **이미 깔린 곳**만 `prometheus` 수신기로 긁는다. 우리가 깔지는 않는다.
+
+**GPM 은 보조 바이너리 `cmp-gpm` 으로 뺐다**
+
+- **처음 나오는 말**: **purego** 는 C 컴파일러(cgo) 없이 Go 에서 공유 라이브러리(`libnvidia-ml.so`)를 열어 함수를 부르는 라이브러리다. **정적 바이너리**는 필요한 것을 모두 안에 넣어 glibc 판에 상관없이 도는 실행 파일이고, **동적 바이너리**는 실행할 때 시스템의 glibc 를 불러 쓴다.
+- purego 로는 본체를 정적으로 둘 수 없다. 공유 라이브러리를 여는 `dlopen` 은 libc 의 동적 로더(`ld.so`)가 하는 일이다. 그래서 purego 를 쓰면 `CGO_ENABLED=0` 이어도 실행 파일이 libc · libdl · libpthread 에 동적 링크된다. 정적 바이너리에는 그 로더가 없다.
+- 그래서 에이전트 본체 `cmp-otelcol` 은 정적으로 두고, NVML 을 여는 코드만 보조 바이너리 `cmp-gpm`(glibc 동적)으로 뺐다. accelerator 수신기가 수집 주기마다 `cmp-gpm` 을 nvidia-smi 와 겹쳐 실행하고 표준 출력의 JSON 을 읽는다. `cmp-gpm` 이 없거나 돌지 못하는 서버에서는 GPM 지표만 빠진다 (`poc/agent/accelerator/README.md`).
+- 실행 비용 (PoC .73, T4 vGPU 게스트):
+
+| 실행 | 걸린 시간 | CPU 시간 |
+|---|---|---|
+| `cmp-gpm` 실제 1회 (T4 는 GPM 미지원이라 건너뜀) | 35ms | 33ms |
+| 탐침 시험 바이너리 20회 평균 (NVML 열기 · 장치 훑기 · GPM 지원 확인 · 닫기) | 28ms | 25ms |
+| `nvidia-smi` | 42ms | 37ms |
+
+- GPM 을 지원하는 장치에서는 샘플 두 개 사이를 기다리느라 `sample_interval`(기본 1s)만큼 더 걸린다. 이 시간은 대기라 CPU 를 쓰지 않는다.
+
+- **T4 vGPU 는 nvidia-smi 로 충분하다.** T4 는 Hopper 이전이라 GPM 이 값을 주지 않고, 게스트에서 nvidia-smi 로 40개 지표가 나온다. GPM 이 꼭 필요한 곳은 **MIG 기반 vGPU** 다. 드라이버가 그 vGPU 의 사용률을 `N/A` 로 주므로 GPM 으로만 사용률을 얻는다. Hopper 이상에서 텐서 · DRAM 실가동률 같은 프로파일 지표가 필요할 때도 GPM 이다.
 
 **질문 2**: AMD · NPU exporter 를 쓰려면 똑같이 컨테이너 런타임(podman 등)이 필요하지 않나?
 
@@ -213,10 +230,10 @@
 |---|---|---|---|
 | AMD | Device Metrics Exporter: 컨테이너 · Helm, 또는 **Ubuntu 22.04/24.04 전용 deb**(`amdgpu-exporter`, `gpuagent` 서비스 동반). rpm 은 문서에 없다 | `amd-smi metric --json` (사용률 · 메모리 · 전력 · 온도 · ECC · XGMI 등) | accelerator 수신기의 **AMD 백엔드** (JSON 파서) |
 | Rebellions | rbln-metrics-exporter: Helm · docker, 사전 빌드 바이너리 없음, `rbln-smd` 데몬에 기댐, **사용권이 Apache 아님** | `rbln-smi -j` (드라이버 패키지에 포함) | **Rebellions 백엔드** |
-| FuriosaAI | furiosa-metrics-exporter: Helm · apt (Ubuntu 22.04+ · 커널 6.3+) | `furiosa-smi-go`: README 상 순수 Go(CGO 없음), sysfs 를 직접 읽음, Apache-2.0 | **Furiosa 백엔드** (라이브러리를 바이너리에 넣음) |
+| FuriosaAI | furiosa-metrics-exporter: Helm · apt (Ubuntu 22.04+ · 커널 6.3+) | `furiosa-smi-go` v1.0.0: 순수 Go(CGO 없음, v0.7.0 까지는 cgo), sysfs 를 직접 읽음, Apache-2.0. go 1.27.2 를 요구한다 | **Furiosa 백엔드** (라이브러리를 바이너리에 넣음) |
 
 - rocm-smi 는 AMD 가 단계 폐지하고 amd-smi 로 옮기라고 하므로 쓰지 않는다.
-- **이름 맞추기**: 수신기가 공통 이름(`gpu_util`, `mem_used`, `temp`, `power`, `ecc_*`)과 `vendor`, `source` 속성을 붙인다. 벤더 원래 이름도 남긴다. NVIDIA ↔ AMD 대응표는 14.3.
+- **이름 맞추기**: 수신기가 같은 값을 벤더 이름(`nvidia.gpu.*` 등)과 공통 이름(`accelerator.gpu_util`, `accelerator.mem_used`, `accelerator.temp`, `accelerator.power`, `accelerator.ecc_*`) 둘로 내고, `vendor` · `source` 속성을 붙인다 (8.2). NVIDIA ↔ AMD 대응표는 14.3.
 - **추론 엔진**(vLLM · Furiosa-LLM `/metrics`)은 원래 HTTP 로 열려 있으니 `prometheus` 수신기로 긁는다.
 
 ### 3.7 조회를 어디로 보내나
@@ -380,7 +397,7 @@
 | 들어오는 OTLP | 세 중계 모두 OTLP/HTTP 를 받는다. **gRPC 는 vtagent 만** 문서로 확인했다. 그래서 에이전트는 OTLP/HTTP 로 보낸다 |
 | 메트릭 이름 | 기본은 OTel 이름(점 포함) 그대로다. `-opentelemetry.usePrometheusNaming` 을 주면 `process.cpu.time` → `process_cpu_time_seconds_total` 처럼 바꾼다. 이 설계는 켠다 (9.2 에서 Prometheus 와 이름을 맞추기 위해) |
 | resource 속성 | 메트릭은 기본으로 전부 라벨이 된다. `-opentelemetry.promoteResourceAttributes` 등으로 고른다. 로그는 전부 스트림 필드가 되고 `VL-Stream-Fields` 헤더로 바꾼다. 트레이스는 확인 필요 |
-| delta 지표 | VictoriaMetrics v1.132.0 부터 그대로 저장한다. 문서는 누적값으로 바꿔 보내라고 권한다. 에이전트에서 `deltatocumulative` 로 바꾼다 |
+| delta 지표 | VictoriaMetrics v1.132.0 부터 그대로 저장한다. 문서는 누적값으로 바꿔 보내라고 권한다. 에이전트에서 누적값으로 바꿀 `deltatocumulative` 는 PoC 빌드에는 아직 없다 (필요하면 contrib deltatocumulative 프로세서를 넣는다) |
 
 **알고 써야 할 점**
 - 한 목적지가 오래 죽어 있을 때 다른 목적지로 보내는 것이 막히지 않는지는 문서에 분명히 적혀 있지 않다. PoC 시험 ②에서 본다.
@@ -614,6 +631,7 @@
 | 노드 A 의 vmagent `kill -9` (1회차) | 18,100 | 18,100 | 18,000 | A 중계 메모리에 있던 B 몫 1초치 |
 | 노드 A 의 vmagent `kill -9` (2회차) | 18,100 | 18,000 | 18,000 | A 중계 메모리에 있던 1초치. **양쪽 모두에서 잃음** |
 | 노드 B VM 강제 재시작 (`openstack server reboot --hard`) | 23,600 | 23,500 | 22,600 | B 중계 메모리 1초치(양쪽), B 저장소가 디스크에 아직 안 쓴 9초치(B 만) |
+| 노드 B VM 강제 재시작 (compose 설치에서 다시) | 23,600 | 23,600 | 22,700 | B 저장소가 디스크에 아직 안 쓴 9초치(B 만). 양쪽에서 함께 잃은 것은 없었다. 주기 대조(7.2)가 5분 안에 메웠다 |
 
 - 받았다고 응답한 뒤 중계가 디스크 큐에 넣기 전까지(`-remoteWrite.flushInterval`, 기본 1초)의 데이터는 **양쪽에서 함께 잃는다.** 보낸 쪽은 이미 응답을 받았으므로 다시 보내지 않는다. 서버 쪽 어떤 동기화로도 되살릴 수 없다.
 - 저장소가 디스크에 쓰기 전(`-inmemoryDataFlushInterval`, 기본 5초)의 데이터는 **그 노드에서만** 잃는다. 상대 노드에는 있으므로 복사해서 메울 수 있지만, 지금 구조에서는 자동으로 메워지지 않는다.
@@ -650,34 +668,68 @@
 
 ### 8.1 부품 구성
 
-원칙: **공식 부품으로 같은 동작이 나오면 공식 부품, 아니면 자체 부품.**
+원칙: **공식 부품으로 같은 동작이 나오면 공식 부품, 아니면 자체 부품.** 자체 부품은 부품마다 Go 모듈 하나로 `poc/agent/<이름>` 에 있다. 부품마다 README 가 있어 설정 · 지표 이름 · 원본과 다른 점을 적는다.
 
-| 기능 | 부품 | 종류 | 공식 / 자체 |
-|---|---|---|---|
-| CPU · 메모리 · 디스크 · 네트워크 · 프로세스 | hostmetrics | receiver | 공식 |
-| 프로세스 Top N 만 남기기 | top10process | processor | 자체 (hostmetrics 는 고르기가 없다) |
-| 시스템 로그: rsyslog 파일 · journald · Windows 이벤트 로그 중 **있는 것을 자동으로 고르기**, syslog 서버, 데몬 · 컨테이너가 연 로그 파일 자동 발견 | unifiedlog · servicelog | receiver | 자체. 원천 읽기는 공식 journald · filelog · syslog · windowseventlog 부품의 라이브러리를 쓸 수 있는지 PoC 에서 본다 |
-| GPU · NPU | accelerator (NVIDIA nvidia-smi · NVML GPM, AMD amd-smi, Rebellions rbln-smi, Furiosa furiosa-smi-go) | receiver | 자체 |
-| GPU 오류 로그(XID)와 GPU 지표 잇기 | gpujoin | processor 또는 connector | 자체 |
-| Windows HTTP · DB 요청 트레이스 | winpackettrace | receiver | 자체 (OBI 는 Windows 를 지원하지 않는다) |
-| Linux eBPF 트레이스 | OBI → 에이전트 `otlp` 수신기 | 별도 프로세스 | 공식. OBI 의 Collector 수신기는 alpha · Linux amd64/arm64 라 기본으로 두지 않는다 |
-| 스크립트 실행 결과 | exec | receiver | 자체 (contrib 에 exec 수신기가 없다) |
-| vSphere 성능 카운터 · 이벤트, ESXi syslog | vsphere + syslog | receiver | 자체 (공식 vcenter 수신기는 alpha 이고 지표가 정해져 있다. 호스트 CPU ready 같은 카운터가 없다) |
-| 이미 있는 exporter · 추론 엔진 | prometheus | receiver | 공식 |
-| 로그 가공 (레벨 판정 등) | transform (OTTL) | processor | 공식 |
-| 노드 2개 중 살아 있는 쪽으로 보내기 | **cmpotlp** + `file_storage` | exporter | 자체 |
+**처음 나오는 말**
+- **receiver(수신기) · processor · exporter · connector**: OTel Collector 부품의 종류다. 수신기는 값을 걷고, processor 는 다듬고, exporter 는 내보낸다. connector 는 한 파이프라인의 출구이자 다른 파이프라인의 입구라서 로그를 받아 지표를 내는 것처럼 신호 종류를 바꿀 수 있다.
+- **Telegraf 포크**: 기존 수집기는 Telegraf 에 자체 플러그인을 더한 것이다. 이 저장소 작성자가 만든 그 플러그인의 로직을 Telegraf 의존성 없이 옮겼다. Telegraf 원본(InfluxData, MIT)에서 온 코드의 고지는 `poc/agent/THIRD_PARTY_NOTICES.md` 에 있다.
+
+| 기능 | 부품 | 종류 | 위치 | 원본 |
+|---|---|---|---|---|
+| CPU · 메모리 · 디스크 · 네트워크 · 프로세스 | hostmetrics | receiver | 공식 contrib | - |
+| 프로세스 Top N 만 남기기 (CPU 상위 10개와 메모리 상위 10개의 합집합) | **top10process** | processor | `poc/agent/top10process` | Telegraf 포크 (procstat 수정분) |
+| 시스템 로그: rsyslog 파일 · journald · Windows 이벤트 로그 중 **있는 것을 자동으로 고르기**, syslog 서버, 데몬 · 컨테이너가 연 로그 파일 자동 발견(`services`) | **unifiedlog** | receiver | `poc/agent/unifiedlog` | Telegraf 포크 (unifiedlog · journald · procdiscovery). Windows 이벤트 로그 읽기는 Telegraf 원본 win_eventlog |
+| GPU · NPU | **accelerator** (백엔드 NVIDIA · AMD · Rebellions · Furiosa) | receiver | `poc/agent/accelerator` | NVIDIA 는 Telegraf 포크 (nvidia_smi 확장 · nvidia_gpm). AMD · Rebellions · Furiosa 는 새로 만듦 |
+| NVML GPM 재기 | `cmp-gpm` | 보조 실행 파일 (glibc 동적) | `poc/agent/accelerator/cmd/cmp-gpm` | Telegraf 포크 (nvidia_gpm). accelerator 가 주기마다 실행한다 (3.6) |
+| GPU 오류 로그(XID)와 GPU 지표 잇기, XID 횟수 지표 | **gpujoin** | connector | `poc/agent/gpujoin` | 새로 만듦 (원본에 XID 코드가 없다) |
+| Windows HTTP · DB 요청 트레이스 | **winpackettrace** | receiver | `poc/agent/winpackettrace` | Telegraf 포크. OBI 는 Windows 를 지원하지 않는다 |
+| 스크립트 실행 결과 | **exec** | receiver | `poc/agent/exec` | Telegraf 원본 exec (포크에 수정분 없음). contrib 에 exec 수신기가 없다 |
+| vSphere 성능 카운터 · 이벤트 (ESXi syslog 는 unifiedlog syslog 서버) | **vsphere** | receiver | `poc/agent/vsphere` | Telegraf 포크 (원본 vsphere + 이벤트 수집). 공식 vcenter 수신기는 alpha 이고 호스트 CPU ready 같은 카운터가 없다 |
+| 하이퍼바이저의 GPU-VM 매핑 · vGPU 사용률 · 브리지 IP | **hypervisor** | receiver | `poc/agent/hypervisor` | 기존 관리 서버 스크립트 (8.5) |
+| 노드 2개 중 살아 있는 쪽으로 보내기 | **cmpotlp** + `file_storage` | exporter | `poc/agent/cmpotlp` | 새로 만듦 |
+| 호스트 정보 · `host.id` 덮어쓰기 · 메모리 한도 · 묶기 | resourcedetection · resource · memory_limiter · batch | processor | 공식 | - |
+| OBI · 앱이 보내는 것 | otlp | receiver | 공식 | - |
+| Linux eBPF 트레이스 | OBI → 에이전트 `otlp` 수신기 | 별도 프로세스 | 공식 | OBI 의 Collector 수신기는 alpha · Linux amd64/arm64 라 기본으로 두지 않는다. 포크의 beyla 는 옮기지 않았다 |
+| 이미 있는 exporter · 추론 엔진 | prometheus | receiver | 공식 | PoC 빌드에는 아직 안 넣었다 |
+| 로그 가공 (레벨 판정 등) | transform (OTTL) | processor | 공식 | PoC 빌드에는 아직 안 넣었다 |
+| delta 지표를 누적값으로 | deltatocumulative | processor | 공식 contrib | PoC 빌드에는 아직 없다. 필요하면 넣는다 (4절, 9.2) |
 
 **`cmpotlp` 를 직접 만드는 이유**: 공식 부품으로는 깔끔하게 안 된다. failoverconnector 는 alpha 이고, 출력 쪽 큐를 켜면 실패를 큐가 찬 뒤에야 알아채 전환이 늦다(issue #50234). 큐 관련 panic 이슈(#47229)도 열려 있다. loadbalancingexporter 는 해시로 나누는 부품이라 실패한 데이터를 다른 곳으로 다시 보내지 않는다. 그래서 **큐에 먼저 쌓고, 꺼내서 보낼 때 살아 있는 주소를 고르는** 출력을 만든다. 죽은 노드 몫으로 데이터가 묶이지 않는다. 평소에는 한 주소에만 보낸다. **시작 주소는 호스트 이름의 해시로** 정해 에이전트마다 고르게 나뉜다. 실패하면 목록의 다음 주소로 넘어가고, **몇 분마다 시작 주소로 돌아가기를 시도**한다. 돌아가지 않으면 죽었던 노드가 살아나도 부하가 한쪽에 남는다 (3.11).
 
-**빌드**: OCB 설정 파일(`builder-config.yaml`)에 자체 부품을 `gomod` · `path` 로 넣는다. 기본이 `CGO_ENABLED=0` 이다. 바이너리 이름은 `cmp-otelcol` 로 한다.
+**gpujoin 이 processor 가 아니라 connector 인 이유**: XID 로그에서 횟수 지표(`nvidia.gpu.xid.count`)를 만들려면 로그를 받아 지표를 내야 한다. processor 는 받은 신호 그대로만 내보내므로 못 한다. 같은 부품이 accelerator 지표에서 PCI 주소 → GPU 표를 배우고, XID 로그 줄에 GPU 속성을 붙인다.
+
+**설정 틀의 흐름** (`poc/agent/config.yaml.tmpl`)
+
+| 파이프라인 | 받기 → 다듬기 → 보내기 |
+|---|---|
+| 지표 | hostmetrics · accelerator · otlp (하이퍼바이저면 + hypervisor) → memory_limiter → top10process → resourcedetection → resource(`host.id`) → batch → cmpotlp, gpujoin |
+| 로그 | unifiedlog · otlp → memory_limiter → gpujoin → (XID 줄에 GPU 속성) → resourcedetection → resource → batch → cmpotlp |
+| XID 지표 | gpujoin → resourcedetection → resource → batch → cmpotlp |
+| 트레이스 | otlp (Windows 는 + winpackettrace) → memory_limiter → resourcedetection → resource → batch → cmpotlp |
+
+- top10process 는 batch 앞에 둔다. 한 묶음이 hostmetrics 한 번 수집분이어야 상위 N 을 바르게 고른다.
+- exec · vsphere 는 설정 파일에 예시만 두고 기본으로 끈다.
+
+**빌드** (`poc/Makefile`)
+- `make agent` 가 OCB 설정 파일(`poc/agent/builder-config.yaml`)로 본체 `cmp-otelcol` 을 빌드한다. 자체 부품은 `replaces` 로 이 저장소의 폴더를 그대로 쓴다. `CGO_ENABLED=0` 이고, Linux 판이 정적 바이너리가 아니면 빌드를 멈춘다.
+- 같은 생성 소스로 Windows 판(`cmp-otelcol.exe`)을, accelerator 모듈에서 `cmp-gpm` 을 따로 빌드한다.
+- **Go 1.27.2 이상이 필요하다.** accelerator 모듈이 쓰는 `furiosa-smi-go` v1.0.0 이 go 1.27.2 를 요구한다. 설치된 go 가 낮으면 `GOTOOLCHAIN=auto` 가 툴체인을 내려받는데, 인터넷이 없는 빌드 기계에서는 Go 1.27.2 를 미리 깔거나 툴체인 모듈을 GOPROXY 로 줘야 한다.
+- `make test` 는 `poc/agent` 아래 Go 모듈마다 `go test` 를 돌린다.
 
 ### 8.2 메트릭 이름
 
-| 지표 | 이름 정책 |
-|---|---|
-| 호스트 메트릭 (hostmetrics) | OTel 표준 이름 (`system.cpu.time` → 저장 시 `system_cpu_time_seconds_total`) |
-| 자체 수신기 (GPU · NPU · vSphere · Top N) | 수신기가 정한 이름 + 공통 이름(`gpu_util` 등) 병기 |
-| exporter 를 긁은 것 | exporter 원래 이름 |
+| 지표 | 이름 정책 | 예 |
+|---|---|---|
+| 호스트 메트릭 (hostmetrics) | OTel 표준 이름 | `system.cpu.time` → 저장 시 `system_cpu_time_seconds_total` |
+| GPU · NPU 벤더 이름 | `<벤더>.<장치>.` 앞말. 단위는 도구가 준 그대로 (MiB 등). 그 벤더만의 지표까지 볼 때 쓴다 | `nvidia.gpu.*`, `amd.gpu.*`, `rebellions.npu.*`, `furiosa.npu.*`. NVIDIA 는 `nvidia.mig.*` · `nvidia.gpm.*` · `nvidia.process.*` 도 |
+| GPU · NPU 공통 이름 | `accelerator.` 앞말. 벤더가 섞인 대시보드 · 알림에 쓴다. 단위를 하나로 맞췄다 (메모리는 By, 온도는 Cel, 전력은 W) | `accelerator.gpu_util`, `accelerator.mem_used`, `accelerator.temp`, `accelerator.power`, `accelerator.ecc_corrected` |
+| 하이퍼바이저 | `hypervisor.` 앞말, vGPU 는 `nvidia.vgpu.*` + 공통 이름 `accelerator.*` | `hypervisor.gpu.mapping`, `nvidia.vgpu.utilization.gpu` |
+| 그 밖의 자체 수신기 | 수신기가 정한 이름 (부품 README) | `vsphere.*`, `nvidia.gpu.xid.count` |
+| exporter 를 긁은 것 | exporter 원래 이름 | |
+
+- 속성 이름은 OTel semconv 를 따른다 (`hw.id`, `hw.model`, `host.id`). semconv 에 없는 것은 부품 앞말을 붙인다 (`accelerator.pci_bus_id`).
+- GPU · NPU 의 모든 포인트에 `vendor`(백엔드 이름)와 `source`(값을 얻은 도구, 예 `nvidia-smi` · `nvml-gpm`)가 붙는다.
+- 벤더 이름 ↔ 공통 이름 대응 전체는 `poc/agent/accelerator/README.md` 의 "공통 이름" 표다.
 
 ### 8.3 어느 OS 에서나 도는 에이전트
 
@@ -687,29 +739,79 @@
 
 | 무엇 | 어떻게 |
 |---|---|
-| 배포판 독립 | CGO 를 끈 정적 Go 바이너리 (OCB 기본값). glibc 버전에 묶이지 않는다 |
-| GPU 라이브러리 | NVML 을 **purego**(C 컴파일러 없이 공유 라이브러리를 여는 Go 라이브러리)로 dlopen 한다. GPU 가 없는 서버에서는 조용히 꺼진다 |
-| 벤더 CLI | nvidia-smi · amd-smi · rbln-smi 를 실행만 한다. 드라이버와 같이 깔린다 |
-| Windows | Collector 본체에 Windows 서비스 처리기가 있다. OCB 로 만든 바이너리가 서비스로 도는 것은 PoC 에서 본다 |
+| 배포판 독립 | 본체는 CGO 를 끈 정적 Go 바이너리 (OCB 기본값). glibc 버전에 묶이지 않는다 |
+| GPU 라이브러리 | NVML GPM 만 보조 바이너리 `cmp-gpm`(purego, glibc 동적)이 연다 (3.6). `cmp-gpm` 이 못 도는 서버에서는 GPM 지표만 빠진다. GPU 가 없는 서버에서는 accelerator 가 조용히 꺼진다 |
+| 벤더 CLI | nvidia-smi · amd-smi · rbln-smi 를 실행만 한다. 드라이버와 같이 깔린다. Furiosa 는 라이브러리(순수 Go)가 본체에 들어 있다 |
+| Windows | Windows 서비스로 돈다 (PoC .162, Windows Server 2025 에서 확인) |
 | eBPF | OBI 만 커널 조건이 있다. 커널 5.8 이상(RHEL 8 계열은 4.18 백포트), BTF 필요, amd64 · arm64. 조건이 안 되는 OS 에서는 트레이스만 빠지고 나머지는 돈다 |
 | 사용자 이름 | 정적 바이너리는 LDAP · SSSD 처럼 NSS 로만 풀리는 사용자 이름을 못 풀어 `process.owner` 가 빠질 수 있다 |
 
+**설치 구조** (`poc/README.md` 의 "에이전트" 절)
+
+| 단계 | 무엇 |
+|---|---|
+| 1. 빌드 | `make agent-package` → Linux 묶음 `cmp-otelcol-<버전>-linux-amd64.tar.gz` (`bin/cmp-otelcol` · `bin/cmp-gpm` · `systemd/cmp-otelcol.service` · `install.sh` · `uninstall.sh` · 설정 틀), Windows 묶음 `...-windows-amd64.zip` (`cmp-otelcol.exe` · `install.ps1` · `uninstall.ps1` · 설정 틀). 두 묶음에 고지 파일과 라이선스가 들어간다 |
+| 2. 서비스 파일 | 서비스 정의는 스크립트 안에 쓰지 않고 파일로 따로 둔다 (`poc/agent/systemd/cmp-otelcol.service`: root, `Restart=always`, 부팅 때 켜짐). Windows 는 `install.ps1` 이 서비스 `cmp-otelcol` 을 LocalSystem · 자동 시작 · 실패하면 5초 뒤 다시 띄움으로 만든다 |
+| 3. 원격 설치 | `poc/bin/install-agent.sh` 가 묶음을 대상 VM 에 올리고 설치 스크립트를 돌린다. Linux 는 SSH(키 또는 비밀번호, root 가 아니면 sudo), Windows 는 WinRM HTTPS(5986). 점프 호스트가 있으면 SSH 터널로 지난다. 인자로 중앙 노드 수집 주소 목록(`--nodes`)을 받는다 |
+| 4. 대상에서 | Linux `install.sh` 는 **root 로만** 돈다. `/cmp-agent` 아래 `bin` · `conf` · `data`(디스크 큐) · `logs` 를 만들고, SELinux 가 켜져 있으면 CIL 모듈을 넣고, 설정 틀을 채워 서비스 파일을 복사하고 서비스를 켠다. Windows 는 `C:\cmp-agent` 에 같은 구조 |
+| 5. 다시 돌리기 · 지우기 | 다시 돌려도 된다 (바이너리 · 설정 · 서비스만 새것으로, 큐는 그대로). `--uninstall` 은 서비스 · 유닛 · SELinux 모듈 · logrotate · `bin` · `conf` · `logs` 를 지우고, `data` 는 `--purge` 일 때만 지운다 |
+
+- **비밀번호는 파일과 명령줄 인자에 남기지 않는다.** 환경 변수 `AGENT_PASSWORD` 에서 읽고, 없으면 프롬프트로 받는다. SSH 는 `sshpass -e` 로 넘긴다. Windows 는 비밀번호만 된다.
+- `host.id`: 설치 스크립트가 SMBIOS uuid 를 읽어 설정에 넣는다 (8.5).
+- `--role hypervisor` 를 주면 hypervisor 수신기를 켠다 (Linux 만).
+
 **SELinux (RHEL · Rocky 등 enforcing)**
 - **처음 나오는 말**: SELinux 는 파일과 프로세스에 라벨(type)을 붙이고 라벨끼리 무엇을 허용할지 정책으로 정한다. `bin_t` 는 실행 파일 라벨, `unconfined_service_t` 는 정책 제약을 거의 받지 않는 서비스 도메인이다.
-- 실행 파일을 `bin_t` 로 라벨링하면 systemd 가 그 서비스를 `unconfined_service_t` 로 띄운다 (Red Hat 의 Dan Walsh 설명, RHEL 7 SELinux 가이드). 그러면 로그 읽기 · 벤더 CLI 실행이 정책에 막히지 않는다. **실제로 AVC(거부 기록)가 0건인지는 PoC 에서 `ausearch -m avc` 로 본다.**
+- 실행 파일을 `bin_t` 로 라벨링하면 systemd 가 그 서비스를 `unconfined_service_t` 로 띄운다 (Red Hat 의 Dan Walsh 설명, RHEL 7 SELinux 가이드). 그러면 로그 읽기 · 벤더 CLI 실행이 정책에 막히지 않는다. **PoC 노드 A(Rocky 10.2, Enforcing)에서 프로세스가 `unconfined_service_t` 로 돌았고 AVC(거부 기록)는 0건이었다** (11.1).
 - 라벨은 `chcon` 으로 붙이지 않는다. `chcon` 은 전체 재라벨링(`restorecon -R`, `/.autorelabel`) 때 정책 기본값으로 돌아간다.
-- `semanage` 도 쓰지 않는다. `semanage` 는 `policycoreutils-python-utils` 패키지에 있어 **없는 서버가 있다.** 대신 라벨 규칙을 담은 작은 **CIL 정책 모듈**을 만들어, SELinux 를 쓰면 늘 있는 `semodule` 로 넣는다. 재라벨링해도 유지되고, 지울 때 `semodule -r` 로 뺀다. 설치 폴더의 하위 폴더마다 라벨을 준다: `bin` 은 `bin_t`, `conf` 는 `etc_t`, `data` 는 `var_lib_t`, `logs` 는 `var_log_t`. (중앙 노드도 처음에는 이 방식이었다가 컨테이너로 바꾸며 뺐다. 아래 "중앙 노드")
-- 정책 기본값만으로 되는 위치도 있다. `/opt/<이름>/bin` 은 기본 정책이 처음부터 `bin_t` 로 잡는다. `/cmp-mon` 같은 위치는 기본값이 `default_t` 라서 모듈이 필요하다.
+- `semanage` 도 쓰지 않는다. `semanage` 는 `policycoreutils-python-utils` 패키지에 있어 **없는 서버가 있다.** 대신 라벨 규칙을 담은 작은 **CIL 정책 모듈** `cmp_agent_files` 를 만들어, SELinux 를 쓰면 늘 있는 `semodule` 로 넣는다. 재라벨링해도 유지되고, 지울 때 `semodule -r` 로 뺀다. 설치 폴더의 하위 폴더마다 라벨을 준다: `bin` 은 `bin_t`, `conf` 는 `etc_t`, `data` 는 `var_lib_t`, `logs` 는 `var_log_t`, 기준 폴더는 `usr_t`. (중앙 노드도 처음에는 이 방식이었다가 컨테이너로 바꾸며 뺐다. 아래 "중앙 노드")
+- 정책 기본값만으로 되는 위치도 있다. `/opt/<이름>/bin` 은 기본 정책이 처음부터 `bin_t` 로 잡는다. `/cmp-agent` 같은 위치는 기본값이 `default_t` 라서 모듈이 필요하다.
 - 컨테이너를 안 쓰므로 `container_t` · `/dev/nvidia*` 장치 라벨(`xserver_misc_device_t`) · `:z` 마운트 문제가 생기지 않는다.
-- OBI 는 별도 프로세스로 root 또는 CAP_BPF · PERFMON 등을 준다. 에이전트 본체는 높은 권한이 필요 없다. SELinux 가 BPF 로드를 막는지는 공식 문서에 언급이 없어 PoC 에서 본다.
+- OBI 는 별도 프로세스로 root 또는 CAP_BPF · PERFMON 등을 준다. 에이전트 본체는 PoC 에서 root 로 돈다(설치 결정). SELinux 가 BPF 로드를 막는지는 공식 문서에 언급이 없어 PoC 에서 본다.
 - **입구 프록시**: 배포판 HAProxy 는 `haproxy_t` 도메인에 갇혀 `haproxy_connect_any` 없이는 4318 · 7443 을 열지 못했다(PoC). 그래서 입구를 vmauth 로 바꿨다(3.10). vmauth 는 다른 중앙 부품처럼 컨테이너로 돈다.
 - **중앙 노드**: 에이전트와 달리 중앙 노드는 컨테이너다(5.5). GPU 장치를 넘길 일이 없어 위의 컨테이너 문제가 없다. container-selinux 정책 아래 프로세스는 `container_t`, bind mount 하는 `conf` · `data` 는 podman 이 `:z` 로 `container_file_t` 라벨을 붙인다. 그래서 중앙 노드에는 CIL 모듈이 필요 없다. host 네트워크로 4318 · 8443 · 7443 · 9094 를 여는 데 불리언이 필요 없었다 (PoC 에서 AVC 0건).
 
 ### 8.4 vSphere 수집
 
-- ESXi 에는 에이전트를 깔 수 없어 중앙에서 vCenter API 를 폴링한다. 같은 `cmp-otelcol` 바이너리를 vSphere 설정으로 띄운다: `vsphere` 수신기 + syslog 서버(ESXi 원격 syslog) + `cmpotlp`.
+- ESXi 에는 에이전트를 깔 수 없어 중앙에서 vCenter API 를 폴링한다. 같은 `cmp-otelcol` 바이너리를 vSphere 설정으로 띄운다: `vsphere` 수신기 + unifiedlog syslog 서버(ESXi 원격 syslog) + `cmpotlp`. vCenter 지표는 다른 호스트의 값이라 `host.id` 를 덮어쓰지 않도록 파이프라인을 따로 둔다.
 - 수집기는 한 곳에서만 돈다. 두 곳에서 돌리면 vCenter 부하가 두 배가 되고 이벤트가 중복된다. 이 수집기를 어느 노드에서 돌리고 장애 때 어떻게 넘길지는 관리 서버 이중화와 함께 정한다.
 - 설정을 바꿨을 때 다시 읽는 방식(파일 감시 또는 재시작)은 PoC 에서 정한다.
+- PoC 는 vCenter 흉내 서버(vcsim)로만 시험했다. 실제 vCenter 로는 아직 안 돌렸다.
+
+### 8.5 하이퍼바이저 수집
+
+**무엇이 바뀌나**: 기존 관리 서버는 하이퍼바이저에 깐 telegraf 의 exec 로 셸 스크립트 두 개(GPU-VM 매핑, 하이퍼바이저 IP)를 60초마다 돌려 InfluxDB 에 썼다. 이것을 에이전트의 **hypervisor 수신기**(Go)로 옮겼다 (사용자 결정). 판단 규칙은 스크립트와 같고, 결과는 다른 지표처럼 OTLP 로 중앙에 간다.
+
+**무엇을 모으나** (KVM/libvirt, OpenStack 컴퓨트 노드 포함)
+
+| 무엇 | 어디서 읽나 | 지표 |
+|---|---|---|
+| GPU 와 VM 의 매핑 (passthrough, vGPU, MIG 기반 vGPU, 미할당) | sysfs(`/sys/bus/pci/devices`, mdev), libvirt 도메인 XML(`virsh`, kolla 의 `nova_libvirt` 컨테이너 우선), `nvidia-smi vgpu -q` | `hypervisor.gpu.mapping` (할당 1, 미할당 0) |
+| 물리 GPU 의 활성 vGPU 수 | `nvidia-smi vgpu -q` | `hypervisor.gpu.vgpu.active` |
+| vGPU 마다 사용률 · 메모리 · 인코더 · 라이선스 | `nvidia-smi vgpu -q` | `nvidia.vgpu.*` + 공통 이름 `accelerator.*` |
+| OVS 브리지의 IPv4 | `ovs-vsctl` (kolla 의 `openvswitch_vswitchd` 컨테이너 우선) | `hypervisor.network.bridge.ipv4` |
+
+- 물리 GPU 자체의 사용률 · 온도는 같은 호스트의 accelerator 수신기가 낸다. 여기서 다시 내지 않는다.
+- 도구가 없으면(GPU 없음, OVS 없음) 그 부분만 건너뛴다. 같은 설정을 모든 하이퍼바이저에 깔 수 있다.
+- 설치할 때 `--role hypervisor` 로 켠다.
+
+**게스트와 잇는 키**: VM 의 키는 **libvirt 도메인 uuid**(OpenStack 인스턴스 uuid 와 같다)다. 게스트 안에서는 SMBIOS system uuid 로 보인다 (Linux `/sys/class/dmi/id/product_uuid`, Windows `Win32_ComputerSystemProduct.UUID`).
+
+| 하이퍼바이저 쪽 | 게스트 쪽 |
+|---|---|
+| `hypervisor.vm.uuid` | 리소스 `host.id` |
+| `hypervisor.guest.pci_bus_id` | `accelerator.pci_bus_id` |
+
+- OTel 의 `resourcedetection` 이 주는 `host.id` 는 machine-id 라 도메인 uuid 와 다르다. 그래서 **에이전트 설치 스크립트가 SMBIOS uuid 를 소문자로 읽어 `host.id` 를 덮어쓴다.** 못 읽으면 넣지 않는다.
+- PoC 에서 .73(Linux 게스트)은 `host.id` = `product_uuid`, 노드 A(OpenStack 인스턴스)는 `host.id` = OpenStack 인스턴스 id 였다 (`openstack server show` 로 대조).
+- **Windows 는 SMBIOS 가 안 보이는 VM 이 있다.** .162(Windows Server 2025)는 `Win32_ComputerSystemProduct` 가 0개, `SMBIOSPresent` 가 False 라 `host.id` 를 넣지 못했다. 이 VM 은 하이퍼바이저 지표와 이을 수 없다. 하이퍼바이저 쪽 VM 의 SMBIOS 설정을 확인해야 한다 (13절).
+
+**기존 이름 → 새 이름**: InfluxDB 의 `gpu_vm_mapping` · `dcgm` · `net` measurement 와 태그 · 필드가 무엇으로 바뀌는지는 `poc/agent/hypervisor/README.md` 의 "기존 스크립트 대응표" 에 있다. 관리 서버의 조회를 옮길 때 이 표를 쓴다 (10절).
+
+**원본과 다른 점** (자세한 것은 같은 README)
+- 못 얻은 값을 `N/A` 문자열로 넣지 않고 속성을 달지 않는다.
+- vGPU 의 게스트 주소를 `vgpu` 라는 글자 대신 실제 게스트 PCI 주소로 낸다.
+- nvidia-smi 에 안 나온 mdev 를 sysfs 로 보충한다. 그래서 미할당 개수가 원본보다 적을 수 있다.
 
 ---
 
@@ -754,7 +856,7 @@
 2. **PromQL 만 쓴다.** MetricsQL 확장 함수(창 생략, `rollup_*` 등)는 쓰지 않는다. 꼭 필요하면 종류가 `victoriametrics` 일 때만 켜는 기능으로 따로 둔다.
 3. **이름을 같게 만든다.** Prometheus OTLP 기본 변환(`UnderscoreEscapingWithSuffixes`: 밑줄로 바꾸고 단위 · 타입 접미사를 붙임)과 VictoriaMetrics `-opentelemetry.usePrometheusNaming` 이 같은 이름을 내는지는 **확인 필요**다. PoC 에서 같은 OTLP 를 두 곳에 보내 시계열 이름을 비교한다.
 4. **resource 속성 승격을 같게 둔다.** Prometheus 는 기본으로 아무것도 라벨로 올리지 않고(`promote_resource_attributes`), VictoriaMetrics 는 기본으로 전부 올린다. 양쪽에 같은 목록을 준다.
-5. **delta 는 에이전트에서 누적값으로 바꿔 보낸다.** Prometheus 의 delta 처리는 실험 기능(`otlp-deltatocumulative`)이다.
+5. **delta 는 에이전트에서 누적값으로 바꿔 보낸다.** Prometheus 의 delta 처리는 실험 기능(`otlp-deltatocumulative`)이다. 에이전트의 `deltatocumulative` 는 PoC 빌드에는 아직 없다 (필요하면 contrib deltatocumulative 프로세서를 넣는다).
 
 **전환 절차**: vmagent 에 `-remoteWrite.url` 로 새 저장소를 하나 더 넣어 **양쪽에 동시에 기록**한다 → 보관 기간만큼 쌓이면 관리 서버와 vmalert 의 주소를 바꾼다 → 옛 쪽을 뺀다. 과거 데이터를 옮길 필요가 없다. Prometheus → VictoriaMetrics 로 과거 데이터를 옮기는 도구(vmctl)는 있다. 반대 방향 도구는 찾지 못해서 동시 기록으로 피한다.
 
@@ -775,6 +877,13 @@
 | 알림 | 규칙을 Prometheus 형식(MetricsQL 확장 없이) · LogsQL 로 만들어 HTTP 로 내주기, Alertmanager webhook 수신, 알림 상태 조회 |
 | 에이전트 설정 | 노드 주소 목록을 내린다. 시작 주소는 에이전트가 호스트 이름으로 정하므로 서버마다 다르게 줄 필요가 없다. 노드를 늘리면 목록만 다시 내린다. 처음에는 배포 도구로, 나중에는 OpAMP 로 |
 | 이중화 | 관리 서버 자체의 이중화(스케줄러 분산 락, DB 이중화)와 vSphere 수집기 배치는 이 문서 범위 밖이다. 따로 설계한다 |
+| 하이퍼바이저 · GPU 조회 | 지금은 InfluxDB 의 `gpu_vm_mapping` · `dcgm` · `net` 을 InfluxQL 로 읽는다. 이것을 VictoriaMetrics 의 `hypervisor.*` · `nvidia.vgpu.*` · `accelerator.*` 를 PromQL 로 읽게 옮긴다 (8.5) |
+
+**하이퍼바이저 · GPU 조회 옮기기**
+- 대응표: `poc/agent/hypervisor/README.md` 의 "기존 스크립트 대응표". measurement 하나가 지표 여러 개로 갈리고(필드마다 지표 하나), 태그 이름이 속성 이름으로 바뀐다 (예: `openstack_vm_uuid` → `hypervisor.vm.uuid`, `host_bdf` → `accelerator.pci_bus_id`). 저장할 때는 점이 밑줄로 바뀐다 (4절 `usePrometheusNaming`).
+- 값의 꼴이 바뀐 것을 쿼리에서 맞춘다: PCI 주소는 `63:00.0` 이 아니라 `00000000:63:00.0`, 못 얻은 값은 `N/A` 대신 속성이 없다, VM 이름이 `host` 태그가 아니라 `hypervisor.vm.name` 이다, 브리지 IP 는 쉼표로 이은 문자열이 아니라 브리지마다 한 시계열이다.
+- VM 과 게스트 지표를 잇는 조인은 `hypervisor.vm.uuid` = 게스트 `host.id` 로 한다 (8.5).
+- **이 일은 관리 서버 쪽 저장소에서 한다.** 이 저장소는 대응표와 수신기까지 낸다.
 
 ---
 
@@ -782,9 +891,9 @@
 
 ![PoC 구성](figures/13-poc.svg)
 
-**구성**: 중앙 노드 2대(Rocky Linux 10, SELinux enforcing, 8 vCPU · 16GB · 80GB), 에이전트 시험 VM(Debian 12 + NVIDIA T4 vGPU). Windows · AMD · NPU 서버는 확보되면 더한다. 판정 노드는 필요 없다. Prometheus 1대(9.2 시험용).
+**구성**: 중앙 노드 2대(Rocky Linux 10, SELinux enforcing, 8 vCPU · 16GB · 80GB, compose), 에이전트 시험 VM 두 대(.73 Debian 12 + NVIDIA T4 vGPU, .162 Windows Server 2025). 에이전트의 SELinux 경로는 노드 A 에 에이전트를 깔아 본다. AMD · NPU 서버는 확보되면 더한다. 판정 노드는 필요 없다. Prometheus 1대(9.2 시험용).
 
-**PoC 구성물은 `poc/` 에 둔다.** 중앙 노드 compose 파일과 설치 스크립트, 설정 파일, OCB 빌드 설정, 시험 절차가 들어간다. 접속 주소 같은 환경 값은 저장소에 넣지 않는다.
+**PoC 구성물은 `poc/` 에 둔다.** 중앙 노드 compose 파일과 설치 스크립트, 설정 파일, 에이전트 부품 · OCB 빌드 설정 · 설치 스크립트, 시험 절차가 들어간다. 접속 주소 같은 환경 값은 저장소에 넣지 않는다.
 
 **중앙 노드는 컨테이너로 띄운다** (Podman 5.8 + podman-compose 1.5, 공식 이미지, 5.5). 노드에 DNS 가 없어 Podman RPM(EL10) · podman-compose wheel · 이미지 tar 를 로컬에서 받아 SSH 로 올리고, 노드에서 저장소를 모두 끈 채 설치한다. 처음 PoC 는 systemd + 정적 바이너리로 설치했고(11.1 의 2026-11-01 ~ 02 오전 결과), 같은 날 compose 로 바꿔 같은 시험을 다시 돌렸다.
 
@@ -833,8 +942,16 @@
 | 시험 2 (compose) | 노드 B 컨테이너를 모두 3분 멈춘 동안 A 조회 200, A 의 B 몫 큐 1,192,437 바이트. 켜자 5초 안에 큐 0, 8분 구간 213,980 · ALERTS 16 으로 같음 | `checks/failover-suite.sh 2` |
 | 시험 3 (compose) | 3분 차단 중 A 큐 624,734 · B 큐 484,458 바이트. 풀린 뒤 A 30초 · B 5초 안에 큐 0, 8분 구간 283,273 · ALERTS 16 으로 같음 | `checks/failover-suite.sh 3` |
 | 주기 대조 (compose) | 노드 B 의 VictoriaMetrics 컨테이너 프로세스를 `kill -9` 하자 3분 구간 A 127,143 · B 123,490 (차 3,653). 대조 컨테이너에서 한 번 돌리자 빠진 1분만 복사(0.63초)해 둘 다 127,143 | `checks/reconcile-test.sh` |
-| 중계 `kill -9` (compose) | 노드 A 의 vmagent 컨테이너 프로세스를 `kill -9` 하자 받았다고 응답한 18,100 샘플 중 A · B 모두 18,000 (1초치 100 개를 양쪽에서 잃음). systemd 때와 같은 결과다 (7.1). 노드 강제 재시작 · 실제 재부팅은 compose 에서 아직 안 함 | `checks/crash-test.sh relay` |
-| 시험 5 · 6, 에이전트를 .73(GPU) 에서, 노드 강제 재시작 중 에이전트 전환, 로그 · 트레이스 주기 대조 | 아직 안 함 | |
+| 중계 `kill -9` (compose) | 노드 A 의 vmagent 컨테이너 프로세스를 `kill -9` 하자 받았다고 응답한 18,100 샘플 중 A · B 모두 18,000 (1초치 100 개를 양쪽에서 잃음). systemd 때와 같은 결과다 (7.1) | `checks/crash-test.sh relay` |
+| 노드 B 강제 재시작 (compose) | `openstack server reboot --hard`. 컨테이너 10개가 저절로 떴다. 받았다고 응답한 23,600 샘플 중 A 23,600 · B 22,700 (B 만 900 빠짐, 양쪽에서 함께 잃은 것은 없음). 보내는 쪽(부하 생성기)은 14초 뒤 A 로 넘어갔고 실패한 전송 0. 5분 안에 주기 대조가 1분을 복사해 B 도 23,600 | `checks/crash-test.sh node` |
+| 노드 B 정상 재부팅 (compose) | `systemctl reboot`. 약 40초 안에 컨테이너 10개 Up, `podman-restart.service` active, `/health` 200, 부팅 뒤 AVC 0 | `podman ps`, 부품 `/health` curl, `ausearch --input-logs -m avc -ts boot` |
+| 에이전트 통합 빌드 | `make agent`: 본체 `cmp-otelcol` 은 정적, `cmp-gpm` 은 glibc 동적, Windows 판 `cmp-otelcol.exe`. `make test` 15 패키지 통과 | `file`, `make test` |
+| 에이전트 설치 .73 (Debian 12, T4 vGPU) | `install-agent.sh` 로 SSH 설치, 서비스 active. 재시작 · `kill` 뒤 되살아남, 다시 설치해도 그대로(멱등). accelerator(nvidia-smi) · top10process · journald 로그가 들어오고 `host.id` = `product_uuid` | 조회 |
+| 설치한 에이전트로 전환 시험 | `install-agent.sh` 로 깐 에이전트(`--interval 1s`)의 시작 노드 입구를 멈췄다 켰다. 1초 샘플 312/312 (빠짐 0). 패키징 단계 때 두 VM 의 지표는 .73 18 · .162 10 시계열 | `checks/agent-failover.sh stop` |
+| 에이전트 설치 .162 (Windows Server 2025) | WinRM 설치, 서비스 Running, 재시작 · `kill` 뒤 되살아남. 이벤트 로그가 들어온다 (구조체 문자열 필드가 비던 결함을 찾아 고침). `host.id` 는 SMBIOS 가 안 보여 못 넣음 (8.5) | 조회 |
+| 에이전트 SELinux 경로 (노드 A, Rocky 10.2 Enforcing) | 키 + sudo 로 설치. CIL 모듈 `cmp_agent_files` 적용, 라벨 `bin_t` · `etc_t` · `var_lib_t` · `var_log_t`, 프로세스 `unconfined_service_t`, AVC 0, 에이전트 로그 error · warn 0. 지표 158 시계열(`host_id` = OpenStack 인스턴스 id), journald 로그 2분 107건. `uninstall --purge` 뒤 모듈 · `/cmp-agent` · 유닛 · logrotate 가 사라지고 AVC 0, 중앙 컨테이너 10개는 그대로 | `ls -Z`, `ps -eZ`, `ausearch -m avc` |
+| hypervisor 수신기 | 점프 호스트(kolla OpenStack, T4 2장)에서 한 번 실행: 매핑 8, vGPU 지표 각 8, 브리지 IPv4 1. 에이전트로 깔아 계속 돌리지는 않음 | 실행 출력 |
+| 시험 5 · 6, 노드 강제 재시작 중 실제 에이전트(`cmp-otelcol`) 전환, 로그 · 트레이스 주기 대조, AMD · NPU 실장비, GPM 을 Hopper 장비에서, winpackettrace 실제 캡처, 실제 vCenter, 하이퍼바이저에 에이전트 상주 | 아직 안 함 | |
 
 ## 12. 도입 순서
 
@@ -848,6 +965,12 @@
 | 3 | 관리 서버 연결: 조회 · 알림 규칙 HTTP 제공 · webhook 수신 | 연결만 끊음 |
 | 4 | vSphere 수집기, 기존 Prometheus 합류, 용량 재산정 | 개별로 되돌림 |
 | 5 | 운영: 큐 · 디스크 경보, vmbackup, 정기 장애 훈련 | - |
+
+**에이전트 배포(2단계) 전에 준비할 것**
+- **빌드 기계에 Go 1.27.2 이상.** accelerator 모듈(`furiosa-smi-go` v1.0.0)이 요구한다. 빌드 기계가 인터넷에 못 나가면 툴체인을 저절로 받지 못하므로 미리 깔거나 툴체인 모듈을 GOPROXY 로 준다 (8.1).
+- **GPU 서버에는 glibc 가 있어야 GPM 이 돈다.** 보조 바이너리 `cmp-gpm` 만 glibc 동적이다. 본체는 정적이라 상관없다 (3.6).
+- **Windows VM 의 SMBIOS.** 하이퍼바이저 지표와 이을 Windows VM 은 게스트에서 `Win32_ComputerSystemProduct.UUID` 가 읽히는지 먼저 본다 (8.5).
+- **관리 서버의 하이퍼바이저 · GPU 조회 이전**(3단계)은 하이퍼바이저에 에이전트를 깔기 전에 끝내거나, 그동안 기존 telegraf 와 함께 돌린다 (10절).
 
 ---
 
@@ -865,6 +988,11 @@
 | Prometheus 와 다른 계산(rate 외삽 없음), exemplar 없음 | 알림 임계값이 조금 달라짐 | 핵심 규칙은 두 저장소에 같은 쿼리를 돌려 비교한다 |
 | 입구 노드가 갑자기 죽음 | 받았다고 응답한 뒤 중계 메모리에 있던 약 1초치를 양쪽에서 잃는다 (7.1 실측) | 에이전트가 한 곳에만 보내는 구조를 고르며 안고 가는 손실이다 (3.11). `-remoteWrite.flushInterval` 로 줄일 수 있는지 PoC 에서 본다 |
 | 노드 사이 단절 동안 두 저장소가 다름 | 조회 결과가 노드마다 다름 | 단절 동안 조회를 한 노드에 고정. 복구 후 큐로 같아진다 |
+| 빌드에 Go 1.27.2 필요 | 인터넷이 없는 빌드 기계에서 빌드가 멈춘다 (`requires go >= 1.27.2`) | Go 1.27.2 를 미리 깔거나 툴체인 모듈을 GOPROXY 로 준다. Furiosa 백엔드가 이 요구의 원인이다 |
+| GPM 보조 바이너리가 glibc 동적 | glibc 가 없거나 너무 낡은 서버에서는 `cmp-gpm` 이 안 돈다. 수집 주기마다 프로세스를 하나 띄운다 (실제 1회 35ms · CPU 33ms, GPM 미지원 T4) | 그 서버는 GPM 만 빠지고 나머지는 돈다. GPM 이 필요한 곳(MIG 기반 vGPU, Hopper 이상 프로파일 지표)에서만 의미가 있다 (3.6) |
+| GPM 지원 장치에서 cmp-gpm 이 길어짐 | 샘플 두 개 사이를 기다리느라 `sample_interval`(기본 1s)만큼 더 걸린다 (대기, CPU 아님) | `sample_interval` 은 100ms 보다 크고 수집 주기보다 작게 둔다. 실행 시간 제한은 `sample_interval + timeout` 이다 |
+| Windows VM 의 SMBIOS 가 안 보임 | `host.id` 를 못 넣어 하이퍼바이저의 GPU-VM 매핑과 게스트 지표를 잇지 못한다 (PoC .162) | 하이퍼바이저 쪽 VM SMBIOS 설정을 확인한다. 원인 확인 필요 |
+| unifiedlog Windows 이벤트 로그의 ProcessID | `eventlog_windows.go` 가 `Execution` 절에서 `fieldValue` 를 새로 선언해 바깥 값을 가린다. 그래서 `ProcessID` 가 프로세스 번호로 안 들어갈 수 있다. Telegraf 원본 win_eventlog 도 같은 코드다 | 원본과 같게 둘지 고칠지 정해야 한다 (결정 대기) |
 
 **확인이 필요한 것**
 - vmagent · vlagent 의 OTLP/gRPC 수신. 이 설계는 HTTP 만 쓴다.
@@ -872,11 +1000,11 @@
 - VictoriaTraces 의 resource 속성 처리 방식.
 - 한 vmalert 가 메트릭 · 로그 규칙을 함께 평가하는 구성 (PoC 시험 10).
 - Prometheus OTLP 이름 변환과 VictoriaMetrics `usePrometheusNaming` 이 같은 이름을 내는지 (PoC 시험 11).
-- OCB 로 만든 바이너리의 Windows 서비스 동작, 정적 바이너리가 오래된 배포판에서 도는지 (`ldd` 로 "not a dynamic executable").
+- 정적 바이너리가 오래된 배포판에서 도는지 (`ldd` 로 "not a dynamic executable"). Windows 서비스 동작은 PoC .162 에서 확인했다.
 - `unconfined_service_t` 에서 BPF 로드가 허용되는지 (OBI).
 - vmauth 가 쓰기 요청(POST)을 상대 노드로 다시 보낼 때 본문을 온전히 다시 보내는지 (`-requestBufferSize`).
 - 복구된 노드를 큐가 빌 때까지 조회에서 빼는 방법 (3.7, 아직 구현 안 함).
-- `furiosa-metrics-exporter` 가 고정한 `furiosa-smi-go` 버전이 이미 순수 Go 인지, furiosa-smi CLI 의 JSON 출력.
+- Furiosa · AMD · Rebellions 백엔드를 실제 장비에서 돌리기. 지금은 공식 문서 · 저장소의 출력 표본으로만 시험했다.
 - amd-smi 가 드라이버 쪽 패키지에 들어 있는지.
 - AMD 파티션(CPX)이 MIG 처럼 격리되는지, NPU 도구가 VM 게스트 안에서 도는지.
 - VictoriaMetrics → Prometheus 과거 데이터 이동 도구 (찾지 못함. 동시 기록으로 피한다).
@@ -885,7 +1013,7 @@
 
 ## 14. 가능한지 조사
 
-질문마다 결론과 근거를 적는다. 출처는 공식 문서와 공개 저장소다(부록 B). 실제로 돌려 본 것은 아니다.
+질문마다 결론과 근거를 적는다. 출처는 공식 문서와 공개 저장소다(부록 B). 대부분 실제로 돌려 본 것은 아니고, PoC 에서 잰 값은 출처에 PoC 라고 적었다.
 
 ### 14.1 저장소를 모두 Victoria 계열로 해도 되나 - Prometheus · OTel 호환
 
@@ -932,7 +1060,9 @@
 | GPM 대상 | Hopper 이상. Ampere 에서는 값이 0 이나 "-" 로 나온다 | NVML GPM 문서, NVIDIA 포럼 답변 |
 | GPM 두 샘플 간격 | 100ms 보다 커야 한다 | NVML GPM 문서 |
 | GPM 을 CLI 로 | `nvidia-smi dmon --gpm-metrics` (csv 만, JSON 없음). Windows 미지원 | nvidia-smi 문서, vGPU 사용자 가이드 |
-| GPM 을 라이브러리로 | NVML 의 `nvmlGpmSampleGet` · `nvmlGpmMigSampleGet` 을 purego 로 dlopen 해 부르면 CGO 없이 빌드된다 | NVML GPM 문서, purego |
+| GPM 을 라이브러리로 | NVML 의 `nvmlGpmSampleGet` · `nvmlGpmMigSampleGet` 을 purego 로 dlopen 해 부르면 CGO 없이 빌드된다. 다만 결과는 glibc 동적 실행 파일이다 (dlopen 이 libc 의 로더에 기댐). 그래서 본체와 나눠 보조 바이너리 `cmp-gpm` 으로 둔다 (3.6) | NVML GPM 문서, purego, PoC 빌드 (`file`) |
+| GPM 실행 비용 | `cmp-gpm` 실제 1회 35ms · CPU 33ms (T4 는 GPM 미지원이라 건너뜀). NVML 열기 · 장치 훑기 · GPM 지원 확인 · 닫기만 하는 탐침 시험 바이너리는 20회 평균 28ms · CPU 25ms. nvidia-smi 42ms · CPU 37ms (PoC .73, T4 vGPU 게스트). GPM 지원 장치에서는 `sample_interval`(기본 1s)만큼 더 걸린다 (대기, CPU 아님) | PoC 실측 |
+| GPM 이 필요한 곳 | MIG 기반 vGPU (드라이버가 사용률을 N/A 로 줌), Hopper 이상의 프로파일 지표. T4 vGPU 게스트는 nvidia-smi 로 40개 지표가 나와 충분하다 | vGPU 사용자 가이드, PoC .73 |
 | vGPU 게스트 | nvidia-smi 는 할당된 vGPU 만 보이고, 3D/compute · 메모리 컨트롤러 · 인코더 · 디코더 · 프레임버퍼 외는 0 이나 N/A | vGPU 사용자 가이드 |
 | MIG | nvidia-smi 의 사용률 조회는 MIG 에서 미지원 → GPM 으로 받는다 | nvidia-smi 문서 |
 | Windows | nvidia-smi 는 64비트 Windows Server 2008 R2 이후. 경로가 PATH 에 없을 수 있다 (`%ProgramW6432%\NVIDIA Corporation\NVSMI\` 또는 `System32`) | NVML 문서 |
@@ -953,12 +1083,12 @@
 | Device Metrics Exporter | 컨테이너 · Helm, Ubuntu 22.04/24.04 deb(`amdgpu-exporter` + `gpuagent`). 쓰지 않는다 |
 | 파티셔닝 | MI300X 는 compute 파티션(SPX · CPX)과 memory 파티션(NPS)이 있다. 전력 · 온도 같은 물리 센서는 파티션 0 에만 나온다 |
 
-**NVIDIA ↔ AMD 지표 대응** (공통 이름으로 맞출 때의 기준. AMD 쪽은 Device Metrics Exporter 이름이고, amd-smi JSON 키와의 대응은 백엔드를 만들 때 맞춘다)
+**NVIDIA ↔ AMD 지표 대응** (공통 이름으로 맞출 때의 기준. AMD 쪽은 Device Metrics Exporter 이름이다. amd-smi JSON 키와의 실제 대응은 `poc/agent/accelerator/README.md` 의 "공통 이름" 표에 있다)
 
-| 공통 이름 (안) | NVIDIA | AMD | 메모 |
+| 공통 이름 (`accelerator.` 앞말) | NVIDIA | AMD | 메모 |
 |---|---|---|---|
 | gpu_util | utilization_gpu | gpu_gfx_activity | 파티션 시 gfx_busy_instantaneous |
-| mem_used / mem_free | memory_used / memory_free | gpu_used_vram / gpu_free_vram | 단위 MiB ↔ MB |
+| mem_used / mem_free | memory_used / memory_free | gpu_used_vram / gpu_free_vram | 둘 다 MiB. amd-smi JSON 은 단위를 MB 로 적지만 실제로 MiB 다 (amdsmi CLI 의 `metric.py` 에서 확인). 공통 이름은 x 1MiB 로 바이트(By)로 낸다 |
 | temp | temperature_gpu | gpu_edge_temperature / gpu_junction_temperature | 모델마다 다름 |
 | mem_temp | memory_temp | gpu_memory_temperature | |
 | power | power_draw | gpu_package_power / gpu_power_usage | |
@@ -971,7 +1101,7 @@
 | 벤더 | 고른 방식 | 근거 | 참고 |
 |---|---|---|---|
 | Rebellions | `rbln-smi -j` 파싱 | rbln-smi 는 RBLN 드라이버 패키지에 들어 있고 `-j, --json` 이 있다. 필드: temperature, card_power, pstate, memory, util 등. rbln-stat 은 rbln-smi 로 대체됨 | exporter 는 Rebellions 자체 사용권, 사전 빌드 바이너리 없음, `rbln-smd` 데몬에 기댐. VM 은 KVM PCI 패스스루만 |
-| FuriosaAI | `furiosa-smi-go` 를 바이너리에 넣음 | README 상 순수 Go, sysfs · devfs 를 직접 읽음, CGO_ENABLED=0 으로 빌드, Apache-2.0 | exporter 는 Helm · apt. furiosa-smi CLI 의 JSON 출력은 문서에 없다. RNGD 는 SR-IOV 8 VF |
+| FuriosaAI | `furiosa-smi-go` v1.0.0 을 바이너리에 넣음 | v1.0.0(2026-10-22) 부터 순수 Go (v0.7.0 까지는 C 라이브러리를 cgo 로 불렀다). sysfs · devfs 를 직접 읽음, CGO_ENABLED=0 으로 빌드, Apache-2.0. go.mod 가 go 1.27.2 를 요구한다 | exporter 는 Helm · apt. furiosa-smi CLI 의 JSON 출력은 문서에 없다. RNGD 는 SR-IOV 8 VF |
 | 추론 엔진 | `prometheus` 수신기 | Furiosa-LLM · vLLM `/metrics` | TTFT, 토큰 처리량 |
 
 ### 14.5 네트워크 환경별로 되나
@@ -1059,32 +1189,39 @@ alertmanager  --web.listen-address=127.0.0.1:9093 \
 # receiver 는 webhook 1개: 관리 서버
 ```
 
-### OCB 에이전트 (발췌)
+### OCB 에이전트 (발췌. 전체는 `poc/agent/config.yaml.tmpl`)
 
 ```yaml
 extensions:
-  file_storage: { directory: <설치경로>/queue }
+  file_storage: { directory: /cmp-agent/data }
 receivers:
-  hostmetrics: { collection_interval: 10s, scrapers: { cpu: {}, memory: {}, disk: {}, filesystem: {}, network: {}, process: {} } }
-  unifiedlog: {}          # 자체. OS 에 따라 rsyslog · journald · eventlog 를 고른다
-  accelerator: {}         # 자체. 드라이버가 있는 벤더만 켜진다
-  otlp: { protocols: { http: { endpoint: 127.0.0.1:4318 } } }   # OBI · 앱
+  host_metrics: { collection_interval: 10s, scrapers: { cpu: {}, memory: {}, load: {}, process: {} } }
+  accelerator: { collection_interval: 10s }   # 자체. 도구가 있는 벤더만 켜진다. NVIDIA GPM 은 bin 의 cmp-gpm 을 실행
+  unifiedlog: { priority: [journald, rsyslog], storage: file_storage }   # 자체. Windows 는 eventlog
+  otlp: { protocols: { http: { endpoint: 127.0.0.1:14318 } } }   # OBI · 앱
+  # hypervisor: {}        # 자체. --role hypervisor 일 때만
 processors:
-  resource: { attributes: [ { key: host.id, value: "<서버 id>", action: upsert } ] }
-  deltatocumulative: {}
+  memory_limiter: { check_interval: 1s, limit_mib: 256 }
+  top10process: { top_n: 10, by: [cpu, memory] }   # 자체. batch 앞에
+  resource_detection: { detectors: [system] }
+  resource: { attributes: [ { key: host.id, value: "<SMBIOS uuid>", action: upsert } ] }
   batch: {}
+connectors:
+  gpujoin: { emit_interval: 60s }   # 자체. XID 로그 ↔ GPU 지표
 exporters:
   cmpotlp:                # 자체
     endpoints: ["https://<노드A>:4318", "https://<노드B>:4318"]   # 노드 전부. 시작 주소는 호스트 이름 해시
-    failback_interval: 5m   # 시작 주소로 돌아가기를 시도하는 간격 (이름은 구현 때 정함)
+    failback_interval: 1m   # 시작 주소로 돌아가기를 시도하는 간격
     tls: { insecure_skip_verify: true }   # 또는 ca_file: 사설 CA
     sending_queue: { storage: file_storage }
 service:
   extensions: [file_storage]
   pipelines:
-    metrics: { receivers: [hostmetrics, accelerator, otlp], processors: [resource, deltatocumulative, batch], exporters: [cmpotlp] }
-    logs:    { receivers: [unifiedlog, otlp], processors: [resource, batch], exporters: [cmpotlp] }
-    traces:  { receivers: [otlp], processors: [resource, batch], exporters: [cmpotlp] }
+    metrics:     { receivers: [host_metrics, accelerator, otlp], processors: [memory_limiter, top10process, resource_detection, resource, batch], exporters: [cmpotlp, gpujoin] }
+    logs/raw:    { receivers: [unifiedlog, otlp], processors: [memory_limiter], exporters: [gpujoin] }
+    logs:        { receivers: [gpujoin], processors: [resource_detection, resource, batch], exporters: [cmpotlp] }
+    metrics/xid: { receivers: [gpujoin], processors: [resource_detection, resource, batch], exporters: [cmpotlp] }
+    traces:      { receivers: [otlp], processors: [memory_limiter, resource_detection, resource, batch], exporters: [cmpotlp] }
 ```
 
 ## 부록 B. 참고 문서
