@@ -1,0 +1,82 @@
+# 새 에이전트(cmp-otelcol) 지표 알림. 이름은 VictoriaMetrics -opentelemetry.usePrometheusNaming 을 거친 저장 이름이다.
+# Prometheus 규칙 형식과 PromQL 만 쓴다 (MetricsQL 확장 함수 · vmalert 전용 필드 없음, README 9.2).
+# 라벨 host_id · host_mac 은 있으면 알림에 따라간다. 관리 서버가 하이퍼바이저 VM 정보와 이을 때 쓴다 (README 9.3).
+groups:
+  - name: agent
+    interval: 30s
+    rules:
+      # 마지막 표본 시각으로 본다. 에이전트가 멈추면 시계열이 조회 창(5분)에서 사라져 비교할 값이 없어지므로,
+      # 1시간 서브쿼리로 마지막 표본 시각을 붙잡는다. 1시간 넘게 없으면 알림이 풀린다.
+      # host_name 으로만 묶는다. host_id · host_mac 이 바뀌면(다시 설치) 옛 라벨의 시계열이 1시간 동안 남아 알림이 잘못 울린다.
+      - alert: AgentNoData
+        expr: |
+          time() - max by (host_name) (
+            max_over_time(timestamp(system_memory_usage_bytes{state="used"})[1h:1m])
+          ) > 300
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.host_name }} 에이전트 지표가 {{ $value | humanizeDuration }} 동안 없다"
+
+      # 모든 CPU 상태 시간 중 idle 이 아닌 비율
+      - alert: HostCpuHigh
+        expr: |
+          100 * (1 - sum by (host_name, host_id, host_mac) (rate(system_cpu_time_seconds_total{state="idle"}[5m]))
+                   / sum by (host_name, host_id, host_mac) (rate(system_cpu_time_seconds_total[5m]))) > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.host_name }} CPU 사용률 {{ $value | printf \"%.1f\" }}%"
+
+      # used / (used + free + buffered + cached). slab 은 used 와 겹쳐 빼고 더한다 (hostmetrics 의 상태 정의)
+      - alert: HostMemoryHigh
+        expr: |
+          100 * sum by (host_name, host_id, host_mac) (system_memory_usage_bytes{state="used"})
+              / sum by (host_name, host_id, host_mac) (system_memory_usage_bytes{state=~"used|free|buffered|cached"}) > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.host_name }} 메모리 사용률 {{ $value | printf \"%.1f\" }}%"
+
+      # hostmetrics filesystem 스크레이퍼가 켜져 있어야 값이 있다
+      - alert: HostFilesystemHigh
+        expr: |
+          100 * sum by (host_name, host_id, host_mac, device, mountpoint) (system_filesystem_usage_bytes{state="used", type!~"tmpfs|devtmpfs|overlay|squashfs|iso9660"})
+              / sum by (host_name, host_id, host_mac, device, mountpoint) (system_filesystem_usage_bytes{type!~"tmpfs|devtmpfs|overlay|squashfs|iso9660"}) > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.host_name }} {{ $labels.mountpoint }} 사용률 {{ $value | printf \"%.1f\" }}%"
+
+      # 벤더 공통 이름이라 NVIDIA · AMD · NPU 에 같이 걸린다
+      - alert: GpuUtilHigh
+        expr: accelerator_gpu_util_percent > 95
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.host_name }} {{ $labels.hw_model }} {{ $labels.accelerator_pci_bus_id }} 사용률 {{ $value }}%"
+
+      # vGPU 게스트의 라이선스 (1 있음, 0 없음)
+      - alert: VgpuLicenseLost
+        expr: nvidia_gpu_vgpu_license_status_ratio == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.host_name }} vGPU 라이선스가 없다"
+
+      # XID 횟수는 첫 XID 때 시계열이 생긴다. increase 는 새 시계열의 첫 표본을 세지 않으므로
+      # 5분 전에 없던 시계열도 함께 잡는다.
+      - alert: GpuXid
+        expr: |
+          increase(nvidia_gpu_xid_count_total[5m]) > 0
+          or (nvidia_gpu_xid_count_total unless nvidia_gpu_xid_count_total offset 5m)
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.host_name }} GPU {{ $labels.accelerator_pci_bus_id }} 에서 XID {{ $labels.nvidia_xid }} 발생"

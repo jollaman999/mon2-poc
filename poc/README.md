@@ -13,7 +13,7 @@
 | `bin/deploy-central.sh` | 중앙 노드 A · B 에 묶음(스크립트 · compose · Podman RPM · 이미지)을 올리고 `central/install.sh` 를 돌린다 |
 | `central/install.sh` | 노드에서 root 로 도는 설치 스크립트. Podman · podman-compose 설치(이미 있으면 건너뜀), 이미지 load, 설정 · 인증서 · 토큰, compose up, 방화벽. 인터넷에 나가지 않는다 |
 | `central/compose/compose.yaml` | 중앙 부품 전부. 모두 `network_mode: host` · `restart: always`, 서비스 계정 uid 로 실행, `BASE_DIR` 아래를 `:z` 로 bind mount |
-| `central/conf/` | Alertmanager 설정, vmalert 규칙, 자체 감시 scrape |
+| `central/conf/` | Alertmanager 설정, vmalert 규칙(`rules/poc.yml` 알림 경로 확인용, `rules/agent.yml` 에이전트 지표 알림), 자체 감시 scrape |
 | `central/gen-gateway.sh` | vmauth 입구 설정(경로 · 토큰)을 만든다 |
 | `central/uninstall.sh` | 지우기 (`bin/deploy-central.sh uninstall [--purge]`). 기본은 데이터를 남긴다 |
 | `central/reconcile-metrics.sh` | 주기 대조(메트릭). 두 노드의 1분 단위 샘플 수를 비교해 상대에만 있는 분을 복사한다. `cmp-mon-reconcile` 컨테이너(공식 vmctl 이미지)가 5분마다 돌린다 (이중화일 때만) |
@@ -25,6 +25,7 @@
 | `checks/crash-test.sh` · `gen-load.py` | 갑자기 죽였을 때 잃는 양 (중계 `kill -9`, 노드 강제 재시작) |
 | `checks/agent-failover.sh` | 에이전트 전환 · 복귀 시험 (시작 주소 노드의 입구 컨테이너 정지, 그 노드로 가는 길 차단) |
 | `checks/reconcile-test.sh` | 주기 대조 시험 (노드 B 저장소 `kill -9` 로 빈틈을 만들고 메워지는지) |
+| `checks/promql-check.sh` | 새 에이전트 지표를 PromQL 로 두 노드에 물어 결과가 있는지 · 값이 같은지 표로 낸다 (CPU · 메모리 · 파일시스템 · 네트워크, GPU, Top N 프로세스, 마지막 표본, XID, 하이퍼바이저 조인). `--url <주소>` 는 토큰 없는 VictoriaMetrics 하나에, `seed <주소>` 는 조인 시험용 가짜 시계열을 시험용 저장소에 넣는다 (설계 문서 9.3) |
 
 ## 중앙 노드에 깔리는 것
 
@@ -69,6 +70,7 @@ bin/fetch-podman.sh <원본 묶음 폴더>       # Podman · podman-compose 묶�
 bin/fetch-images.sh                       # 공식 이미지 tar
 bin/deploy-central.sh all                 # A, B 순서로 설치 (NODE_B 가 비면 A 만, 단일 노드)
 checks/central-health.sh                  # 컨테이너 상태 · 포트 · 토큰 · AVC 확인
+checks/promql-check.sh                    # 에이전트 지표 PromQL 조회 · 두 노드 비교
 bin/deploy-central.sh uninstall all       # 컨테이너 · 설정 지우기 (데이터는 남김)
 bin/deploy-central.sh uninstall --purge all   # 데이터 · 이미지 · 계정까지 지우기
 ```

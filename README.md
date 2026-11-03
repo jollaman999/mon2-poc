@@ -868,6 +868,96 @@
 - Prometheus 단일 노드에는 이 설계의 이중 기록 · 디스크 큐가 없다. Prometheus 로 갈 때도 vmagent 를 앞에 두면 같은 HA 를 얻는다.
 - 장기 보관 · 다운샘플링 방식은 서로 다르다.
 
+### 9.3 새 에이전트 지표를 PromQL 로 보기
+
+조회 입구는 노드마다 `https://<노드>:8443/metrics/api/v1/query` (조회 토큰)다. 쿼리 목록 전체와 두 노드 비교는 `poc/checks/promql-check.sh` (`print` 로 쿼리만 낸다).
+
+**이름 대응**: VictoriaMetrics 의 `-opentelemetry.usePrometheusNaming` 이 점을 밑줄로 바꾸고 단위 · 타입 접미사를 붙인다. 카운터는 `_total`, 단위 `1` 인 gauge 는 `_ratio` 가 붙는다. 아래는 PoC 노드의 `/api/v1/label/__name__/values` 와 로컬에서 에이전트를 돌려 쌓은 이름이다.
+
+| OTel 이름 | 저장 이름 | 라벨 (리소스 · 포인트 속성) |
+|---|---|---|
+| `system.cpu.time` | `system_cpu_time_seconds_total` | `host_name`, `host_id`, `host_mac`, `os_type`, `state` |
+| `system.memory.usage` | `system_memory_usage_bytes` | `state` (Linux `used` · `free` · `buffered` · `cached` · `slab_*`, Windows `used` · `free`) |
+| `system.filesystem.usage` | `system_filesystem_usage_bytes` | `device`, `mountpoint`, `type`, `mode`, `state` |
+| `system.network.io` | `system_network_io_bytes_total` | `device`, `direction` |
+| `process.cpu.time` · `process.memory.usage` | `process_cpu_time_seconds_total` · `process_memory_usage_bytes` | `process_executable_name`, `process_pid`, `process_command_line`, `process_owner` |
+| `accelerator.gpu_util` · `accelerator.mem_used` | `accelerator_gpu_util_percent` · `accelerator_mem_used_bytes` | `vendor`, `source`, `hw_id`, `hw_model`, `accelerator_pci_bus_id`, `accelerator_index` |
+| `nvidia.gpu.utilization.gpu` · `nvidia.gpu.memory.used` | `nvidia_gpu_utilization_gpu_percent` · `nvidia_gpu_memory_used_MiB` | 위와 같음 |
+| `nvidia.gpu.vgpu.license_status` | `nvidia_gpu_vgpu_license_status_ratio` | 위와 같음 |
+| `nvidia.gpu.xid.count` | `nvidia_gpu_xid_count_total` | `nvidia_xid`, `accelerator_pci_bus_id`, `hw_id` |
+| `hypervisor.vm.info` | `hypervisor_vm_info_ratio` | `hypervisor_vm_uuid`, `hypervisor_vm_mac`, `hypervisor_vm_name`, `hypervisor_vm_domain` + 하이퍼바이저 자신의 `host_*` |
+| `hypervisor.gpu.mapping` | `hypervisor_gpu_mapping_ratio` | `accelerator_pci_bus_id`(물리), `hypervisor_guest_pci_bus_id`, `hypervisor_vm_uuid`, `hw_id`, `nvidia_vgpu_profile` 등 |
+| `nvidia.vgpu.utilization.gpu` | `nvidia_vgpu_utilization_gpu_percent` | `hw_id`(vGPU), `hw_parent`, `hypervisor_vm_uuid` 등 |
+
+- 에이전트 설정(`poc/agent/config.yaml.tmpl`, Windows 판도)의 hostmetrics 스크레이퍼는 `cpu` · `memory` · `load` · `filesystem` · `network` · `disk` · `paging` · `process` 다. 처음엔 `filesystem` · `network` 가 빠져 있어 PoC 에서 더했다.
+- `cpu` 속성이 없다 (hostmetrics 기본이 CPU 별로 나누지 않는다). 호스트 단위 사용률은 그대로 구한다.
+
+**쿼리 예**
+
+```promql
+# CPU 사용률 % (idle 을 뺀 비율)
+100 * (1 - sum by (host_name) (rate(system_cpu_time_seconds_total{state="idle"}[5m]))
+         / sum by (host_name) (rate(system_cpu_time_seconds_total[5m])))
+# 메모리 사용률 %. slab 은 used 에 들어 있어 분모에서 뺀다 (hostmetrics 의 상태 정의)
+100 * sum by (host_name) (system_memory_usage_bytes{state="used"})
+    / sum by (host_name) (system_memory_usage_bytes{state=~"used|free|buffered|cached"})
+# 파일시스템 사용률 %
+100 * sum by (host_name, mountpoint) (system_filesystem_usage_bytes{state="used", type!~"tmpfs|devtmpfs|overlay|squashfs|iso9660"})
+    / sum by (host_name, mountpoint) (system_filesystem_usage_bytes{type!~"tmpfs|devtmpfs|overlay|squashfs|iso9660"})
+# 네트워크 bps
+8 * sum by (host_name, direction) (rate(system_network_io_bytes_total{device!~"lo|docker.*|veth.*|virbr.*"}[5m]))
+# GPU (공통 이름, 벤더 이름)
+accelerator_gpu_util_percent
+accelerator_mem_used_bytes
+nvidia_gpu_utilization_gpu_percent
+# 호스트마다 CPU 상위 5개 프로세스 (top10process 가 남긴 프로세스 중에서)
+topk by (host_name) (5, sum by (host_name, process_executable_name, process_pid) (rate(process_cpu_time_seconds_total[5m])))
+# 마지막 표본에서 지난 초
+time() - max by (host_name) (max_over_time(timestamp(system_memory_usage_bytes{state="used"})[1h:1m]))
+# XID 횟수. XID 가 한 번도 없으면 시계열이 없다 (첫 XID 때 생긴다)
+sum by (host_name, accelerator_pci_bus_id, nvidia_xid) (increase(nvidia_gpu_xid_count_total[1h]))
+```
+
+**하이퍼바이저 VM 과 게스트 잇기** (8.5): `hypervisor_vm_info_ratio` 의 키 라벨을 `label_replace` 로 게스트의 라벨 이름(`host_id`, `host_mac`)으로 바꾸고 `on() group_left` 로 붙인다.
+
+```promql
+# uuid 로: 게스트 CPU 사용률에 VM 이름 · 하이퍼바이저를 붙인다
+100 * (1 - sum by (host_id) (rate(system_cpu_time_seconds_total{state="idle", host_id!=""}[5m]))
+         / sum by (host_id) (rate(system_cpu_time_seconds_total{host_id!=""}[5m])))
+* on (host_id) group_left (hypervisor_vm_name, hypervisor_vm_domain, hypervisor_host)
+  max by (host_id, hypervisor_vm_name, hypervisor_vm_domain, hypervisor_host) (
+    label_replace(label_replace(hypervisor_vm_info_ratio{hypervisor_vm_uuid!=""},
+      "host_id", "$1", "hypervisor_vm_uuid", "(.+)"), "hypervisor_host", "$1", "host_name", "(.*)"))
+
+# MAC 으로: host_id 가 없는 게스트만 (uuid 로 이어진 게스트가 두 번 나오지 않게)
+... {host_id="", host_mac!=""} ... * on (host_mac) group_left (...)
+  max by (host_mac, ...) (label_replace(... hypervisor_vm_info_ratio{hypervisor_vm_mac!=""}, "host_mac", "$1", "hypervisor_vm_mac", "(.+)") ...)
+
+# 게스트 GPU ↔ 물리 GPU: hypervisor_gpu_mapping_ratio 의 (hypervisor_vm_uuid, hypervisor_guest_pci_bus_id) 를
+# 게스트의 (host_id, accelerator_pci_bus_id) 로 바꾸고, 물리 주소는 physical_pci_bus_id 로 옮겨 붙인다
+```
+
+- **키가 빈 VM 을 거른다** (`hypervisor_vm_uuid!=""`). 하이퍼바이저 지표에도 하이퍼바이저 자신의 `host_id` · `host_mac` 이 붙어 있어, `label_replace` 가 못 바꾼 시계열은 하이퍼바이저 호스트 자신의 지표와 이어진다.
+- 오른쪽을 `max by` 로 키마다 하나로 줄인다. 같은 VM 이 조회 창(5분) 안에 두 하이퍼바이저에서 보이면(라이브 마이그레이션) `hypervisor_host` 가 둘이라 `group_left` 가 중복 오류를 낸다. 관리 서버는 이때 `hypervisor_host` 를 빼고 묻는다.
+- 하이퍼바이저 수신기는 공통 이름(`accelerator_*`)을 낼 수 있지만(`common_names`), 에이전트 설정 틀에서는 끈다. 게스트 에이전트가 같은 vGPU 의 공통 이름을 내므로 둘 다 내면 합칠 때나 알림에서 두 번 센다. 하이퍼바이저 쪽 vGPU 값은 `nvidia_vgpu_*` 로 본다.
+- 전체 쿼리 문자열은 `poc/checks/promql-check.sh` 의 `join_uuid` · `join_mac` · `join_gpu`. PoC 결과는 11.1.
+
+**알림 규칙** (`poc/central/conf/rules/agent.yml`, 그룹 `agent`, 30초마다)
+
+| 규칙 | 조건 | 지속 |
+|---|---|---|
+| `AgentNoData` | 호스트의 마지막 `system_memory_usage_bytes` 표본이 5분보다 오래됨. `absent` · `up` 으로는 못 본다 (OTLP 로 밀어 넣어 `up` 이 없고, `absent` 는 호스트를 모른다). 1시간 서브쿼리로 마지막 표본 시각을 잡아 두므로 1시간 넘게 없으면 풀린다. `host_name` 으로만 묶는다 (아래) | 1분 |
+| `HostCpuHigh` | CPU 사용률 > 90% | 5분 |
+| `HostMemoryHigh` | 메모리 사용률 > 90% | 5분 |
+| `HostFilesystemHigh` | 파일시스템 사용률 > 90% (tmpfs 등 제외). | 5분 |
+| `GpuUtilHigh` | `accelerator_gpu_util_percent` > 95 | 10분 |
+| `VgpuLicenseLost` | `nvidia_gpu_vgpu_license_status_ratio == 0` | 2분 |
+| `GpuXid` | `increase(nvidia_gpu_xid_count_total[5m]) > 0`, 또는 5분 전에 없던 XID 시계열. `increase` 는 새 시계열의 첫 표본을 세지 않아 첫 XID 를 놓치므로 둘째 조건을 더한다 | 바로 |
+
+- Prometheus 규칙 형식과 PromQL 만 쓴다 (`label_replace`, 서브쿼리, `timestamp`, `topk by` 모두 PromQL). 같은 규칙과 같은 시험 입력을 `promtool test rules`(Prometheus v3.8.0)와 `vmalert-tool unittest`(v1.155.0)로 돌려 둘 다 기대한 알림을 냈다.
+- `AgentNoData` 를 `host_id` · `host_mac` 까지로 묶었더니, PoC 에서 에이전트를 다시 깔아 `host_mac` 이 붙은 뒤에도 `host_mac` 없는 옛 시계열이 1시간 창에 남아 두 VM 모두 "30분 동안 없다" 로 잘못 울렸다. 그래서 `host_name` 으로만 묶는다. 다른 규칙은 5분 조회 창 안의 값만 보므로 옛 시계열이 끼지 않는다.
+- 로그 규칙은 아직 없다.
+
 ---
 
 ## 10. 관리 서버가 지켜야 할 것
@@ -954,7 +1044,10 @@
 | 에이전트 설치 .162 (Windows Server 2025) | WinRM 설치, 서비스 Running, 재시작 · `kill` 뒤 되살아남. 이벤트 로그가 들어온다 (구조체 문자열 필드가 비던 결함을 찾아 고침). `host.id` 는 SMBIOS 3.0 진입점만 있어 못 넣음, 대신 `host.mac` 이 지표 · 로그에 붙고 `virsh dumpxml` 의 MAC 과 같다 (8.5) | 조회 |
 | 에이전트 SELinux 경로 (노드 A, Rocky 10.2 Enforcing) | 키 + sudo 로 설치. CIL 모듈 `cmp_agent_files` 적용, 라벨 `bin_t` · `etc_t` · `var_lib_t` · `var_log_t`, 프로세스 `unconfined_service_t`, AVC 0, 에이전트 로그 error · warn 0. 지표 158 시계열(`host_id` = OpenStack 인스턴스 id), journald 로그 2분 107건. `uninstall --purge` 뒤 모듈 · `/cmp-agent` · 유닛 · logrotate 가 사라지고 AVC 0, 중앙 컨테이너 10개는 그대로 | `ls -Z`, `ps -eZ`, `ausearch -m avc` |
 | hypervisor 수신기 | 점프 호스트(kolla OpenStack, T4 2장)에서 한 번 실행: 매핑 8, vGPU 지표 각 8, 브리지 IPv4 1. 에이전트로 깔아 계속 돌리지는 않음 | 실행 출력 |
-| 시험 5 · 6, 노드 강제 재시작 중 실제 에이전트(`cmp-otelcol`) 전환, 로그 · 트레이스 주기 대조, AMD · NPU 실장비, GPM 을 Hopper 장비에서, winpackettrace 실제 캡처, 실제 vCenter, 하이퍼바이저에 에이전트 상주 | 아직 안 함 | |
+| 새 에이전트 지표 PromQL 조회 (11-03) | 에이전트 세 곳(.73 Linux vGPU · .162 Windows vGPU · 하이퍼바이저)을 두 노드에 같은 시각으로 물어 CPU · 메모리 · 파일시스템 · 네트워크 사용률, GPU 공통 이름 · NVIDIA 이름, vGPU 라이선스, Top 5 프로세스(CPU · 메모리), 마지막 표본 시각이 모두 나오고 두 노드 값이 같다 (16개 중 실패 0, XID 는 실제 XID 가 없어 결과 없음이 정상). 처음엔 파일시스템 · 네트워크가 비어 있어 에이전트 설정에 `filesystem` · `network` · `disk` · `paging` 스크레이퍼를 넣었다. 하이퍼바이저를 막 띄운 직후 한 번 Top N 시계열 집합이 두 노드에서 달랐고, 두 번 다시 돌려 같아졌다 | `checks/promql-check.sh` |
+| 하이퍼바이저 조인 PromQL (11-03) | 점프 호스트(하이퍼바이저, Tesla T4 2장 · vGPU 8개)에 에이전트를 `--role hypervisor` 로 설치(사용자 승인). `hypervisor_vm_info` 14 · `hypervisor_gpu_mapping` 8 · `nvidia_vgpu_*` 각 8 시계열이 두 노드에 들어왔다. 조인 셋이 실제로 이어졌다: uuid 조인으로 .73 의 CPU 가 instance-0000000d 에, MAC 조인으로 .162 의 CPU 가 instance-00000006 에, 게스트 GPU(`00000000:00:05.0`) 가 물리 GPU `00000000:AB:00.0` 에. 그 전에 로컬 VictoriaMetrics 에 testdata 로 같은 조인을 먼저 시험했다. 하이퍼바이저 쪽 `accelerator.*` 공통 이름은 게스트 값과 겹쳐 알림이 두 번 울려서 끈다(`common_names: false`). 하이퍼바이저 에이전트 부담: RSS 약 133MB, CPU 30초 평균 코어 하나의 5%(48코어), journald 로그 10분 2,057건(분당 약 200건). 프로세스가 자주 생기고 사라져 10초마다 나던 `error reading cpu times for process` 는 `mute_process_all_errors` 로 감췄고 다시 설치한 뒤 2분 동안 오류 0 | `checks/promql-check.sh`, 점프 호스트 `/proc/<pid>/stat` |
+| 에이전트 알림 규칙 (11-03) | `rules/agent.yml` 7개를 두 노드에 배포, vmalert 규칙 모두 health ok · lastError 없음. .162 의 vGPU 라이선스가 실제로 0 이라 `VgpuLicenseLost` 가 2분 뒤 발화했고 두 노드 Alertmanager 에 같은 알림 하나로 들어왔다. 첫 배포 때 `AgentNoData` 가 옛 라벨 시계열 때문에 잘못 울려 `host_name` 으로만 묶게 고쳤다 (9.3). 세 곳 설치 뒤 실제로 `HostFilesystemHigh`(.162 C: 98%)와 `VgpuLicenseLost`(.162) 가 울리고 나머지는 inactive 다. 같은 규칙을 `promtool test rules` 와 `vmalert-tool unittest` 로 돌려 둘 다 통과 | `/api/v1/rules`, Alertmanager `/api/v2/alerts` |
+| 시험 5 · 6, 노드 강제 재시작 중 실제 에이전트(`cmp-otelcol`) 전환, 로그 · 트레이스 주기 대조, AMD · NPU 실장비, GPM 을 Hopper 장비에서, winpackettrace 실제 캡처, 실제 vCenter | 아직 안 함 | |
 
 ## 12. 도입 순서
 
