@@ -258,11 +258,13 @@ func (w *winEventLog) toRecord(event event) record {
 			fieldValue = event.Source.Name
 			fieldType = reflect.TypeOf(fieldValue).String()
 		case "Execution":
-			fieldValue := event.Execution.ProcessID
+			// 원본은 여기서 := 로 바깥 fieldValue 를 가려 ProcessID 대신 Execution 구조체가 남았다 (그래서 필드가 빠졌다)
+			pid := event.Execution.ProcessID
+			fieldValue = pid
 			fieldType = reflect.TypeOf(fieldValue).String()
 			fieldName = "ProcessID"
 			if should, _ := w.filters.shouldProcessField("ProcessName"); should {
-				if processName, err := getFromSnapProcess(fieldValue); err == nil {
+				if processName, err := getFromSnapProcess(pid); err == nil {
 					computedValues["ProcessName"] = processName
 				}
 			}

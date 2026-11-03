@@ -85,6 +85,7 @@ semconv 에 있는 것은 semconv 이름으로, 없는 것은 원본 키 그대�
 
 | 무엇 | 원본 | 여기 | 이유 |
 |---|---|---|---|
+| Windows 이벤트 로그의 ProcessID | 원본 win_eventlog 는 `Execution` 절에서 `fieldValue :=` 로 바깥 변수를 가려 ProcessID 대신 구조체가 남았고, 그래서 필드가 빠졌다. 이식본은 프로세스 번호를 넣는다 (.162 실측: 고친 뒤 이벤트 로그 모두 ProcessID 있음) |
 | 파일 따라 읽기 | influxdata/tail (inotify) | 직접 구현. 200ms 마다 읽고, 다음 부품이 받은 데까지만 위치를 올리며 거절당하면 다시 읽는다. 회전(이름 바뀜) · copytruncate 처리 | 의존성을 늘리지 않고, 위치 기억 · 재전송을 tailer 안에서 하려고 |
 | rsyslog 위치 | `offsets_path` (예약, 미구현) | storage 확장 | 위 "위치 기억" |
 | services 위치 · 여러 줄 묶음 | 위치 없음. 묶음은 2s 마다 무조건 내보냄 | storage 에 위치를 남긴다. 덜 찬 묶음의 줄은 위치에 넣지 않고 다시 넘기며, 묶음의 첫 줄을 읽은 지 2s 가 지나면 내보낸다 | 거절 · 재시작 때 묶음을 잃지 않게 |

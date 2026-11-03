@@ -992,7 +992,6 @@
 | GPM 보조 바이너리가 glibc 동적 | glibc 가 없거나 너무 낡은 서버에서는 `cmp-gpm` 이 안 돈다. 수집 주기마다 프로세스를 하나 띄운다 (실제 1회 35ms · CPU 33ms, GPM 미지원 T4) | 그 서버는 GPM 만 빠지고 나머지는 돈다. GPM 이 필요한 곳(MIG 기반 vGPU, Hopper 이상 프로파일 지표)에서만 의미가 있다 (3.6) |
 | GPM 지원 장치에서 cmp-gpm 이 길어짐 | 샘플 두 개 사이를 기다리느라 `sample_interval`(기본 1s)만큼 더 걸린다 (대기, CPU 아님) | `sample_interval` 은 100ms 보다 크고 수집 주기보다 작게 둔다. 실행 시간 제한은 `sample_interval + timeout` 이다 |
 | Windows VM 의 SMBIOS 가 안 보임 | `host.id` 를 못 넣어 하이퍼바이저의 GPU-VM 매핑과 게스트 지표를 잇지 못한다 (PoC .162) | 하이퍼바이저 쪽 VM SMBIOS 설정을 확인한다. 원인 확인 필요 |
-| unifiedlog Windows 이벤트 로그의 ProcessID | `eventlog_windows.go` 가 `Execution` 절에서 `fieldValue` 를 새로 선언해 바깥 값을 가린다. 그래서 `ProcessID` 가 프로세스 번호로 안 들어갈 수 있다. Telegraf 원본 win_eventlog 도 같은 코드다 | 원본과 같게 둘지 고칠지 정해야 한다 (결정 대기) |
 
 **확인이 필요한 것**
 - vmagent · vlagent 의 OTLP/gRPC 수신. 이 설계는 HTTP 만 쓴다.
