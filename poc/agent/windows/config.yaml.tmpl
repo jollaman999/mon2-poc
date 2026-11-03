@@ -28,12 +28,18 @@ receivers:
       cpu: {}
       memory: {}
       load: {}
+      filesystem: {}
+      network: {}
+      disk: {}
+      paging: {}
       # 프로세스별 지표. top10process 가 CPU · 메모리 상위 N 개만 남긴다
       process:
         mute_process_name_error: true
         mute_process_exe_error: true
         mute_process_io_error: true
         mute_process_user_error: true
+        # 수집하는 사이에 끝난 프로세스의 "error reading cpu times" 를 감춘다. 따로 감추는 옵션이 없다 (.162 에서도 1분에 1건 났다)
+        mute_process_all_errors: true
   # GPU · NPU. 도구가 있는 백엔드만 켜진다. NVIDIA GPM 은 bin 의 cmp-gpm 을 수집 주기마다 실행한다.
   # 주기는 설치 인자 -Interval 과 따로 10s 다. GPM 샘플 간격(1s)보다 길어야 하고, 벤더 도구 실행 비용이 있어서다
   accelerator:

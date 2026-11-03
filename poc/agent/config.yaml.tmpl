@@ -28,6 +28,10 @@ receivers:
       cpu: {}
       memory: {}
       load: {}
+      filesystem: {}
+      network: {}
+      disk: {}
+      paging: {}
       # 프로세스별 지표. top10process 가 CPU · 메모리 상위 N 개만 남긴다
       process:
         mute_process_name_error: true
@@ -35,6 +39,9 @@ receivers:
         mute_process_io_error: true
         mute_process_user_error: true
         mute_process_cgroup_error: true
+        # 수집하는 사이에 끝난 프로세스의 "error reading cpu times" 를 감춘다. 따로 감추는 옵션이 없다
+        # (하이퍼바이저처럼 프로세스가 자주 생기고 사라지는 호스트에서 10초마다 오류 로그가 났다)
+        mute_process_all_errors: true
   # GPU · NPU. 도구가 있는 백엔드만 켜진다. NVIDIA GPM 은 bin 의 cmp-gpm 을 수집 주기마다 실행한다.
   # 주기는 설치 인자 --interval 과 따로 10s 다. GPM 샘플 간격(1s)보다 길어야 하고, 벤더 도구 실행 비용이 있어서다
   accelerator:
@@ -50,6 +57,8 @@ receivers:
   # KVM/libvirt 하이퍼바이저의 GPU-VM 매핑 · vGPU 지표 · OVS 브리지 IPv4. install.sh --role hypervisor 일 때만 metrics 에 넣는다
   hypervisor:
     collection_interval: 60s
+    # vGPU 의 accelerator.* 공통 이름은 게스트 에이전트가 낸다. 여기서도 내면 같은 vGPU 가 두 번 잡혀 알림이 겹친다
+    common_names: false
 
   # 아래 둘은 기본으로 끈다. 켜려면 이 설정 파일을 고쳐 receivers 와 pipelines 에 넣는다.
   #
