@@ -3,6 +3,8 @@ package hypervisor
 import (
 	"context"
 	"encoding/xml"
+	"net"
+	"sort"
 	"strings"
 )
 
@@ -17,7 +19,12 @@ type domain struct {
 		} `xml:"instance"`
 	} `xml:"metadata"`
 	Devices struct {
-		Hostdevs []hostdev `xml:"hostdev"`
+		Hostdevs   []hostdev `xml:"hostdev"`
+		Interfaces []struct {
+			MAC struct {
+				Address string `xml:"address,attr"`
+			} `xml:"mac"`
+		} `xml:"interface"`
 	} `xml:"devices"`
 }
 
@@ -56,6 +63,26 @@ func (d *domain) vmName() string {
 		return d.Metadata.Instance.Name
 	}
 	return d.Name
+}
+
+// macs 는 도메인 NIC(<interface>)의 MAC 을 소문자 콜론 꼴(fa:16:3e:00:00:01)로 정렬하고 겹친 것을 뺀 목록이다.
+// MAC 으로 읽히지 않는 값은 뺀다.
+func (d *domain) macs() []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, i := range d.Devices.Interfaces {
+		hw, err := net.ParseMAC(strings.TrimSpace(i.MAC.Address))
+		if err != nil || len(hw) != 6 {
+			continue
+		}
+		m := hw.String()
+		if !seen[m] {
+			seen[m] = true
+			out = append(out, m)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // guestAddr 는 hostdev 가 게스트 안에서 받은 PCI 주소다. 없으면 기존 스크립트처럼 00:00.0 으로 둔다.

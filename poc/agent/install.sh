@@ -10,6 +10,7 @@
 #   --start-key   시작 주소를 고를 때 해시할 값 (기본 호스트 이름)
 #   --role        hypervisor 면 KVM/libvirt 하이퍼바이저 수신기(GPU-VM 매핑 · vGPU · OVS)를 켠다. 기본은 없음
 # host.id 는 /sys/class/dmi/id/product_uuid(소문자)로 덮어쓴다. 하이퍼바이저가 보는 VM uuid 와 같은 값이다. 못 읽으면 넣지 않는다.
+# host.mac 은 NIC MAC 을 소문자 콜론 꼴로 정렬해 쉼표로 이은 것이다. 하이퍼바이저가 보는 VM 의 NIC MAC 목록과 같은 꼴이다.
 # exec · vsphere 수신기는 설정 파일(conf/config.yaml)에 예시만 있다. 고쳐서 켠다.
 # 기준 폴더 /cmp-agent 아래: bin(실행 파일) · conf(설정) · data(file_storage 디스크 큐) · logs(에이전트 로그)
 set -euo pipefail
@@ -57,11 +58,14 @@ case $role in
 esac
 # VM 이면 하이퍼바이저가 붙인 uuid 다. 형식이 uuid 가 아니면(빈 값, 권한 없음) 넣지 않는다
 host_id=$(tr '[:upper:]' '[:lower:]' </sys/class/dmi/id/product_uuid 2>/dev/null || true)
-if [[ $host_id =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
-  host_id_proc=", resource"
-else
-  host_id="" host_id_proc=""
-fi
+res_sed=()
+[[ $host_id =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] || { host_id=""; res_sed+=(-e '/@HOST_ID@/d'); }
+# device 링크가 있는 NIC 만 (virtio · 물리). bridge · veth · docker · tun · 루프백은 링크가 없다
+host_mac=$(for d in /sys/class/net/*; do [ -e "$d/device" ] && cat "$d/address"; done 2>/dev/null \
+  | tr '[:upper:]' '[:lower:]' | grep -E '^([0-9a-f]{2}:){5}[0-9a-f]{2}$' | grep -vx '00:00:00:00:00:00' | sort -u | paste -sd, - || true)
+[ -n "$host_mac" ] || res_sed+=(-e '/@HOST_MAC@/d')
+resource_proc=""
+[ -n "$host_id$host_mac" ] && resource_proc=", resource"
 
 echo "[1/6] 폴더"
 # 기준 폴더는 다른 것과 같이 쓸 수 있으므로 우리 하위 폴더만 만든다
@@ -82,12 +86,12 @@ echo "[3/6] 설정"
 [ "$tls_verify" = ca ] && install -m 0644 "$ca" "$CONF_DIR/ca.pem"
 sed -e "s|@QUEUE_DIR@|$DATA_DIR|" -e "s|@INTERVAL@|$interval|" -e "s|@ENDPOINTS@|$endpoints|" \
     -e "s|@START_KEY@|$start_key|" -e "s|@FAILBACK@|$failback|" -e "s|@TLS@|$tls_line|" \
-    -e "s|@LOG_FILE@|$LOG_DIR/$NAME.log|g" -e "s|@HOST_ID@|$host_id|" -e "s|@HOST_ID_PROC@|$host_id_proc|g" \
-    -e "s|@ROLE_RECEIVERS@|$role_receivers|" config.yaml.tmpl > "$CONF_DIR/.config.yaml.new"
+    -e "s|@LOG_FILE@|$LOG_DIR/$NAME.log|g" "${res_sed[@]}" -e "s|@HOST_ID@|$host_id|" -e "s|@HOST_MAC@|$host_mac|" \
+    -e "s|@RESOURCE_PROC@|$resource_proc|g" -e "s|@ROLE_RECEIVERS@|$role_receivers|" config.yaml.tmpl > "$CONF_DIR/.config.yaml.new"
 chmod 0640 "$CONF_DIR/.config.yaml.new"
 "$BIN_DIR/$NAME" validate --config "$CONF_DIR/.config.yaml.new"
 mv -f "$CONF_DIR/.config.yaml.new" "$CONF_DIR/config.yaml"
-echo "노드 $nodes, 수집 주기 $interval, 돌아가기 $failback, TLS $tls_verify, host.id ${host_id:-(없음)}, 역할 ${role:-(없음)}"
+echo "노드 $nodes, 수집 주기 $interval, 돌아가기 $failback, TLS $tls_verify, host.id ${host_id:-(없음)}, host.mac ${host_mac:-(없음)}, 역할 ${role:-(없음)}"
 
 echo "[4/6] SELinux 라벨"
 # semanage(policycoreutils-python-utils)는 없는 서버가 있다. 그래서 라벨 규칙을 CIL 정책 모듈로 만들어

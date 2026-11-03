@@ -685,9 +685,9 @@
 | Windows HTTP · DB 요청 트레이스 | **winpackettrace** | receiver | `poc/agent/winpackettrace` | Telegraf 포크. OBI 는 Windows 를 지원하지 않는다 |
 | 스크립트 실행 결과 | **exec** | receiver | `poc/agent/exec` | Telegraf 원본 exec (포크에 수정분 없음). contrib 에 exec 수신기가 없다 |
 | vSphere 성능 카운터 · 이벤트 (ESXi syslog 는 unifiedlog syslog 서버) | **vsphere** | receiver | `poc/agent/vsphere` | Telegraf 포크 (원본 vsphere + 이벤트 수집). 공식 vcenter 수신기는 alpha 이고 호스트 CPU ready 같은 카운터가 없다 |
-| 하이퍼바이저의 GPU-VM 매핑 · vGPU 사용률 · 브리지 IP | **hypervisor** | receiver | `poc/agent/hypervisor` | 기존 관리 서버 스크립트 (8.5) |
+| 하이퍼바이저의 GPU-VM 매핑 · vGPU 사용률 · 브리지 IP · VM 정보(uuid · MAC) | **hypervisor** | receiver | `poc/agent/hypervisor` | 기존 관리 서버 스크립트 (8.5) |
 | 노드 2개 중 살아 있는 쪽으로 보내기 | **cmpotlp** + `file_storage` | exporter | `poc/agent/cmpotlp` | 새로 만듦 |
-| 호스트 정보 · `host.id` 덮어쓰기 · 메모리 한도 · 묶기 | resourcedetection · resource · memory_limiter · batch | processor | 공식 | - |
+| 호스트 정보 · `host.id` · `host.mac` 덮어쓰기 · 메모리 한도 · 묶기 | resourcedetection · resource · memory_limiter · batch | processor | 공식 | - |
 | OBI · 앱이 보내는 것 | otlp | receiver | 공식 | - |
 | Linux eBPF 트레이스 | OBI → 에이전트 `otlp` 수신기 | 별도 프로세스 | 공식 | OBI 의 Collector 수신기는 alpha · Linux amd64/arm64 라 기본으로 두지 않는다. 포크의 beyla 는 옮기지 않았다 |
 | 이미 있는 exporter · 추론 엔진 | prometheus | receiver | 공식 | PoC 빌드에는 아직 안 넣었다 |
@@ -702,7 +702,7 @@
 
 | 파이프라인 | 받기 → 다듬기 → 보내기 |
 |---|---|
-| 지표 | hostmetrics · accelerator · otlp (하이퍼바이저면 + hypervisor) → memory_limiter → top10process → resourcedetection → resource(`host.id`) → batch → cmpotlp, gpujoin |
+| 지표 | hostmetrics · accelerator · otlp (하이퍼바이저면 + hypervisor) → memory_limiter → top10process → resourcedetection → resource(`host.id`, `host.mac`) → batch → cmpotlp, gpujoin |
 | 로그 | unifiedlog · otlp → memory_limiter → gpujoin → (XID 줄에 GPU 속성) → resourcedetection → resource → batch → cmpotlp |
 | XID 지표 | gpujoin → resourcedetection → resource → batch → cmpotlp |
 | 트레이스 | otlp (Windows 는 + winpackettrace) → memory_limiter → resourcedetection → resource → batch → cmpotlp |
@@ -757,7 +757,7 @@
 | 5. 다시 돌리기 · 지우기 | 다시 돌려도 된다 (바이너리 · 설정 · 서비스만 새것으로, 큐는 그대로). `--uninstall` 은 서비스 · 유닛 · SELinux 모듈 · logrotate · `bin` · `conf` · `logs` 를 지우고, `data` 는 `--purge` 일 때만 지운다 |
 
 - **비밀번호는 파일과 명령줄 인자에 남기지 않는다.** 환경 변수 `AGENT_PASSWORD` 에서 읽고, 없으면 프롬프트로 받는다. SSH 는 `sshpass -e` 로 넘긴다. Windows 는 비밀번호만 된다.
-- `host.id`: 설치 스크립트가 SMBIOS uuid 를 읽어 설정에 넣는다 (8.5).
+- `host.id` · `host.mac`: 설치 스크립트가 SMBIOS uuid 와 NIC MAC 목록을 읽어 설정에 넣는다 (8.5).
 - `--role hypervisor` 를 주면 hypervisor 수신기를 켠다 (Linux 만).
 
 **SELinux (RHEL · Rocky 등 enforcing)**
@@ -790,21 +790,24 @@
 | 물리 GPU 의 활성 vGPU 수 | `nvidia-smi vgpu -q` | `hypervisor.gpu.vgpu.active` |
 | vGPU 마다 사용률 · 메모리 · 인코더 · 라이선스 | `nvidia-smi vgpu -q` | `nvidia.vgpu.*` + 공통 이름 `accelerator.*` |
 | OVS 브리지의 IPv4 | `ovs-vsctl` (kolla 의 `openvswitch_vswitchd` 컨테이너 우선) | `hypervisor.network.bridge.ipv4` |
+| 실행 중인 VM 마다 게스트와 잇는 키 (도메인 uuid, NIC MAC) | libvirt 도메인 XML(`<uuid>`, `<interface>` 의 `<mac address>`) | `hypervisor.vm.info` (값 1) |
 
 - 물리 GPU 자체의 사용률 · 온도는 같은 호스트의 accelerator 수신기가 낸다. 여기서 다시 내지 않는다.
 - 도구가 없으면(GPU 없음, OVS 없음) 그 부분만 건너뛴다. 같은 설정을 모든 하이퍼바이저에 깔 수 있다.
 - 설치할 때 `--role hypervisor` 로 켠다.
 
-**게스트와 잇는 키**: VM 의 키는 **libvirt 도메인 uuid**(OpenStack 인스턴스 uuid 와 같다)다. 게스트 안에서는 SMBIOS system uuid 로 보인다 (Linux `/sys/class/dmi/id/product_uuid`, Windows `Win32_ComputerSystemProduct.UUID`).
+**게스트와 잇는 키**: 첫째는 **libvirt 도메인 uuid**(OpenStack 인스턴스 uuid 와 같다)다. 게스트 안에서는 SMBIOS system uuid 로 보인다 (Linux `/sys/class/dmi/id/product_uuid`, Windows `Win32_ComputerSystemProduct.UUID`). uuid 를 못 읽는 게스트가 있어 **NIC MAC 을 둘째 키로 덧붙였다** (사용자 결정).
 
 | 하이퍼바이저 쪽 | 게스트 쪽 |
 |---|---|
 | `hypervisor.vm.uuid` | 리소스 `host.id` |
+| `hypervisor.vm.mac` | 리소스 `host.mac` |
 | `hypervisor.guest.pci_bus_id` | `accelerator.pci_bus_id` |
 
 - OTel 의 `resourcedetection` 이 주는 `host.id` 는 machine-id 라 도메인 uuid 와 다르다. 그래서 **에이전트 설치 스크립트가 SMBIOS uuid 를 소문자로 읽어 `host.id` 를 덮어쓴다.** 못 읽으면 넣지 않는다.
-- PoC 에서 .73(Linux 게스트)은 `host.id` = `product_uuid`, 노드 A(OpenStack 인스턴스)는 `host.id` = OpenStack 인스턴스 id 였다 (`openstack server show` 로 대조).
-- **Windows 는 SMBIOS 가 안 보이는 VM 이 있다.** .162(Windows Server 2025)는 `Win32_ComputerSystemProduct` 가 0개, `SMBIOSPresent` 가 False 라 `host.id` 를 넣지 못했다. 이 VM 은 하이퍼바이저 지표와 이을 수 없다. 하이퍼바이저 쪽 VM 의 SMBIOS 설정을 확인해야 한다 (13절).
+- MAC 은 양쪽 다 **소문자 콜론 꼴을 정렬해 쉼표로 이은 한 문자열**이다 (`fa:16:3e:7e:6e:e9`). PromQL 조인은 레이블 값이 같아야 해서 한 VM 의 값을 글자까지 같게 만든다. 게스트는 설치 스크립트가 NIC(Linux 는 `/sys/class/net/*/device` 가 있는 것, Windows 는 `Get-NetAdapter -Physical`)의 MAC 을 읽어 넣는다. `resourcedetection` 의 `host.mac` 은 대문자 대시 꼴 목록이고 docker0 · veth 까지 담아 쓰지 않는다. 설치할 때 한 번 읽으므로 NIC 를 바꾸면 다시 설치한다.
+- PoC 에서 .73(Linux 게스트)은 `host.id` = `product_uuid`, 노드 A(OpenStack 인스턴스)는 `host.id` = OpenStack 인스턴스 id 였다 (`openstack server show` 로 대조). `host.mac` 은 .73 · .162 모두 `virsh dumpxml` 의 `<mac address>` 와 hypervisor 수신기의 `hypervisor.vm.mac` 과 같았다 (2026-11-03).
+- **레거시 BIOS 로 부팅한 Windows VM 은 SMBIOS 를 못 읽는다.** 하이퍼바이저(QEMU 8.2.2 + SeaBIOS, 머신 `pc-i440fx-noble`)가 SMBIOS 3.0 진입점(`_SM3_`)만 주고, 레거시 BIOS 로 부팅한 Windows Server 2025 는 그것을 못 읽는다. 근거: 같은 하이퍼바이저의 .73 에서 `/sys/firmware/dmi/tables/smbios_entry_point` 가 `_SM3_` 로 시작하고, .162 는 `SMBIOSPresent` 가 False · `firmware_type` 이 Legacy 이며, 두 VM 의 libvirt SMBIOS 설정(`<sysinfo>`, `<os>`)이 uuid · serial 말고 같다. 그래서 .162 는 `host.id` 를 못 넣고 **MAC 으로 잇는다.** uuid 로도 이으려면 UEFI 로 부팅하거나 32비트 진입점을 주게 해야 한다 (PoC 에서 해 보지 않음, 13절).
 
 **기존 이름 → 새 이름**: InfluxDB 의 `gpu_vm_mapping` · `dcgm` · `net` measurement 와 태그 · 필드가 무엇으로 바뀌는지는 `poc/agent/hypervisor/README.md` 의 "기존 스크립트 대응표" 에 있다. 관리 서버의 조회를 옮길 때 이 표를 쓴다 (10절).
 
@@ -882,7 +885,7 @@
 **하이퍼바이저 · GPU 조회 옮기기**
 - 대응표: `poc/agent/hypervisor/README.md` 의 "기존 스크립트 대응표". measurement 하나가 지표 여러 개로 갈리고(필드마다 지표 하나), 태그 이름이 속성 이름으로 바뀐다 (예: `openstack_vm_uuid` → `hypervisor.vm.uuid`, `host_bdf` → `accelerator.pci_bus_id`). 저장할 때는 점이 밑줄로 바뀐다 (4절 `usePrometheusNaming`).
 - 값의 꼴이 바뀐 것을 쿼리에서 맞춘다: PCI 주소는 `63:00.0` 이 아니라 `00000000:63:00.0`, 못 얻은 값은 `N/A` 대신 속성이 없다, VM 이름이 `host` 태그가 아니라 `hypervisor.vm.name` 이다, 브리지 IP 는 쉼표로 이은 문자열이 아니라 브리지마다 한 시계열이다.
-- VM 과 게스트 지표를 잇는 조인은 `hypervisor.vm.uuid` = 게스트 `host.id` 로 한다 (8.5).
+- VM 과 게스트 지표를 잇는 조인은 `hypervisor.vm.uuid` = 게스트 `host.id` 로 하고, 게스트에 `host.id` 가 없으면 `hypervisor.vm.mac` = 게스트 `host.mac` 으로 한다 (8.5). 둘 다 `hypervisor.vm.info` 에 있다.
 - **이 일은 관리 서버 쪽 저장소에서 한다.** 이 저장소는 대응표와 수신기까지 낸다.
 
 ---
@@ -946,9 +949,9 @@
 | 노드 B 강제 재시작 (compose) | `openstack server reboot --hard`. 컨테이너 10개가 저절로 떴다. 받았다고 응답한 23,600 샘플 중 A 23,600 · B 22,700 (B 만 900 빠짐, 양쪽에서 함께 잃은 것은 없음). 보내는 쪽(부하 생성기)은 14초 뒤 A 로 넘어갔고 실패한 전송 0. 5분 안에 주기 대조가 1분을 복사해 B 도 23,600 | `checks/crash-test.sh node` |
 | 노드 B 정상 재부팅 (compose) | `systemctl reboot`. 약 40초 안에 컨테이너 10개 Up, `podman-restart.service` active, `/health` 200, 부팅 뒤 AVC 0 | `podman ps`, 부품 `/health` curl, `ausearch --input-logs -m avc -ts boot` |
 | 에이전트 통합 빌드 | `make agent`: 본체 `cmp-otelcol` 은 정적, `cmp-gpm` 은 glibc 동적, Windows 판 `cmp-otelcol.exe`. `make test` 15 패키지 통과 | `file`, `make test` |
-| 에이전트 설치 .73 (Debian 12, T4 vGPU) | `install-agent.sh` 로 SSH 설치, 서비스 active. 재시작 · `kill` 뒤 되살아남, 다시 설치해도 그대로(멱등). accelerator(nvidia-smi) · top10process · journald 로그가 들어오고 `host.id` = `product_uuid` | 조회 |
+| 에이전트 설치 .73 (Debian 12, T4 vGPU) | `install-agent.sh` 로 SSH 설치, 서비스 active. 재시작 · `kill` 뒤 되살아남, 다시 설치해도 그대로(멱등). accelerator(nvidia-smi) · top10process · journald 로그가 들어오고 `host.id` = `product_uuid`, `host.mac` = `virsh dumpxml` 의 MAC | 조회 |
 | 설치한 에이전트로 전환 시험 | `install-agent.sh` 로 깐 에이전트(`--interval 1s`)의 시작 노드 입구를 멈췄다 켰다. 1초 샘플 312/312 (빠짐 0). 패키징 단계 때 두 VM 의 지표는 .73 18 · .162 10 시계열 | `checks/agent-failover.sh stop` |
-| 에이전트 설치 .162 (Windows Server 2025) | WinRM 설치, 서비스 Running, 재시작 · `kill` 뒤 되살아남. 이벤트 로그가 들어온다 (구조체 문자열 필드가 비던 결함을 찾아 고침). `host.id` 는 SMBIOS 가 안 보여 못 넣음 (8.5) | 조회 |
+| 에이전트 설치 .162 (Windows Server 2025) | WinRM 설치, 서비스 Running, 재시작 · `kill` 뒤 되살아남. 이벤트 로그가 들어온다 (구조체 문자열 필드가 비던 결함을 찾아 고침). `host.id` 는 SMBIOS 3.0 진입점만 있어 못 넣음, 대신 `host.mac` 이 지표 · 로그에 붙고 `virsh dumpxml` 의 MAC 과 같다 (8.5) | 조회 |
 | 에이전트 SELinux 경로 (노드 A, Rocky 10.2 Enforcing) | 키 + sudo 로 설치. CIL 모듈 `cmp_agent_files` 적용, 라벨 `bin_t` · `etc_t` · `var_lib_t` · `var_log_t`, 프로세스 `unconfined_service_t`, AVC 0, 에이전트 로그 error · warn 0. 지표 158 시계열(`host_id` = OpenStack 인스턴스 id), journald 로그 2분 107건. `uninstall --purge` 뒤 모듈 · `/cmp-agent` · 유닛 · logrotate 가 사라지고 AVC 0, 중앙 컨테이너 10개는 그대로 | `ls -Z`, `ps -eZ`, `ausearch -m avc` |
 | hypervisor 수신기 | 점프 호스트(kolla OpenStack, T4 2장)에서 한 번 실행: 매핑 8, vGPU 지표 각 8, 브리지 IPv4 1. 에이전트로 깔아 계속 돌리지는 않음 | 실행 출력 |
 | 시험 5 · 6, 노드 강제 재시작 중 실제 에이전트(`cmp-otelcol`) 전환, 로그 · 트레이스 주기 대조, AMD · NPU 실장비, GPM 을 Hopper 장비에서, winpackettrace 실제 캡처, 실제 vCenter, 하이퍼바이저에 에이전트 상주 | 아직 안 함 | |
@@ -969,7 +972,7 @@
 **에이전트 배포(2단계) 전에 준비할 것**
 - **빌드 기계에 Go 1.27.2 이상.** accelerator 모듈(`furiosa-smi-go` v1.0.0)이 요구한다. 빌드 기계가 인터넷에 못 나가면 툴체인을 저절로 받지 못하므로 미리 깔거나 툴체인 모듈을 GOPROXY 로 준다 (8.1).
 - **GPU 서버에는 glibc 가 있어야 GPM 이 돈다.** 보조 바이너리 `cmp-gpm` 만 glibc 동적이다. 본체는 정적이라 상관없다 (3.6).
-- **Windows VM 의 SMBIOS.** 하이퍼바이저 지표와 이을 Windows VM 은 게스트에서 `Win32_ComputerSystemProduct.UUID` 가 읽히는지 먼저 본다 (8.5).
+- **Windows VM 의 SMBIOS.** 레거시 BIOS 로 부팅한 Windows VM 은 `Win32_ComputerSystemProduct.UUID` 가 안 읽혀 MAC 으로만 이어진다. uuid 로도 이으려면 그 이미지를 UEFI 로 부팅하게 하는지 정한다 (8.5).
 - **관리 서버의 하이퍼바이저 · GPU 조회 이전**(3단계)은 하이퍼바이저에 에이전트를 깔기 전에 끝내거나, 그동안 기존 telegraf 와 함께 돌린다 (10절).
 
 ---
@@ -991,7 +994,7 @@
 | 빌드에 Go 1.27.2 필요 | 인터넷이 없는 빌드 기계에서 빌드가 멈춘다 (`requires go >= 1.27.2`) | Go 1.27.2 를 미리 깔거나 툴체인 모듈을 GOPROXY 로 준다. Furiosa 백엔드가 이 요구의 원인이다 |
 | GPM 보조 바이너리가 glibc 동적 | glibc 가 없거나 너무 낡은 서버에서는 `cmp-gpm` 이 안 돈다. 수집 주기마다 프로세스를 하나 띄운다 (실제 1회 35ms · CPU 33ms, GPM 미지원 T4) | 그 서버는 GPM 만 빠지고 나머지는 돈다. GPM 이 필요한 곳(MIG 기반 vGPU, Hopper 이상 프로파일 지표)에서만 의미가 있다 (3.6) |
 | GPM 지원 장치에서 cmp-gpm 이 길어짐 | 샘플 두 개 사이를 기다리느라 `sample_interval`(기본 1s)만큼 더 걸린다 (대기, CPU 아님) | `sample_interval` 은 100ms 보다 크고 수집 주기보다 작게 둔다. 실행 시간 제한은 `sample_interval + timeout` 이다 |
-| Windows VM 의 SMBIOS 가 안 보임 | `host.id` 를 못 넣어 하이퍼바이저의 GPU-VM 매핑과 게스트 지표를 잇지 못한다 (PoC .162) | 하이퍼바이저 쪽 VM SMBIOS 설정을 확인한다. 원인 확인 필요 |
+| Windows VM 의 SMBIOS 가 안 보임 | 하이퍼바이저(QEMU 8.2.2 + SeaBIOS, `pc-i440fx-noble`)가 SMBIOS 3.0 진입점(`_SM3_`)만 줘서 레거시 BIOS 로 부팅한 Windows 가 못 읽는다. `host.id` 가 없다 (PoC .162: `SMBIOSPresent` False, `firmware_type` Legacy, libvirt SMBIOS 설정은 .73 과 같음) | `host.mac` 으로 잇는다 (PoC 에서 .162 확인). MAC 은 NIC 를 바꾸면 다시 설치해야 하고 게스트 bond 에서 어긋날 수 있다. uuid 로 이으려면 이미지를 UEFI 로 부팅(`hw_firmware_type=uefi`)하거나 32비트 진입점을 주게 한다 (해 보지 않음) |
 
 **확인이 필요한 것**
 - vmagent · vlagent 의 OTLP/gRPC 수신. 이 설계는 HTTP 만 쓴다.
@@ -1203,7 +1206,7 @@ processors:
   memory_limiter: { check_interval: 1s, limit_mib: 256 }
   top10process: { top_n: 10, by: [cpu, memory] }   # 자체. batch 앞에
   resource_detection: { detectors: [system] }
-  resource: { attributes: [ { key: host.id, value: "<SMBIOS uuid>", action: upsert } ] }
+  resource: { attributes: [ { key: host.id, value: "<SMBIOS uuid>", action: upsert }, { key: host.mac, value: "<NIC MAC 목록>", action: upsert } ] }
   batch: {}
 connectors:
   gpujoin: { emit_interval: 60s }   # 자체. XID 로그 ↔ GPU 지표

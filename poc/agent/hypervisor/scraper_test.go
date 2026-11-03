@@ -168,10 +168,24 @@ func TestParseDomain(t *testing.T) {
 	if err != nil || len(d.Devices.Hostdevs) != 0 || d.vmName() != "dls-test" {
 		t.Errorf("GPU 없는 도메인 %v %+v", err, d)
 	}
+	if m := d.macs(); len(m) != 1 || m[0] != "fa:16:3e:00:00:09" {
+		t.Errorf("MAC %v", m)
+	}
 	// nova 메타데이터가 없는 libvirt 도메인은 도메인 이름을 쓴다
 	d, _ = parseDomain([]byte(`<domain><name>plain-kvm</name><uuid>abc</uuid></domain>`))
-	if d.vmName() != "plain-kvm" {
-		t.Errorf("vmName %q", d.vmName())
+	if d.vmName() != "plain-kvm" || d.macs() != nil {
+		t.Errorf("vmName %q MAC %v", d.vmName(), d.macs())
+	}
+	// NIC 여럿: 소문자 콜론으로 맞추고 정렬하며, 겹친 것과 MAC 이 아닌 값은 뺀다
+	d, _ = parseDomain([]byte(`<domain><name>multi</name><devices>
+<interface type='bridge'><mac address='FA:16:3E:00:00:0B'/></interface>
+<interface type='ethernet'><mac address=' fa:16:3e:00:00:0a '/></interface>
+<interface type='network'><mac address='fa-16-3e-00-00-0b'/></interface>
+<interface type='network'><mac address='not-a-mac'/></interface>
+<interface type='user'/>
+</devices></domain>`))
+	if m := strings.Join(d.macs(), ","); m != "fa:16:3e:00:00:0a,fa:16:3e:00:00:0b" {
+		t.Errorf("여러 NIC MAC %q", m)
 	}
 }
 
@@ -240,6 +254,24 @@ func TestScrapeT4Host(t *testing.T) {
 	for _, n := range []string{"nvidia.vgpu.utilization.gpu", "accelerator.gpu_util", "nvidia.vgpu.utilization.ofa", "nvidia.vgpu.fbc.latency"} {
 		if len(got[n]) != 8 {
 			t.Errorf("%s 포인트 %d 개", n, len(got[n]))
+		}
+	}
+	// VM 정보는 실행 중인 도메인 9개 모두 (GPU 없는 instance-00000014 포함)
+	if info := got[mVMInfo]; len(info) != 9 {
+		t.Errorf("VM 정보 %d 개: %v", len(info), info)
+	}
+	for dom, want := range map[string]map[string]string{
+		"instance-0000000d": {attrVMName: "vgpu-linux-test-03", attrVMUUID: t4VGPUs[6].vm, attrVMMAC: "fa:16:3e:00:00:07", attrSource: "libvirt"},
+		"instance-00000014": {attrVMName: "dls-test", attrVMMAC: "fa:16:3e:00:00:09", attrSource: "libvirt"},
+	} {
+		p := find(t, got[mVMInfo], map[string]string{attrVMDomain: dom})
+		if p.value != 1 {
+			t.Errorf("%s VM 정보 값 %v", dom, p.value)
+		}
+		for k, w := range want {
+			if p.attrs[k] != w {
+				t.Errorf("%s VM 정보 %s = %q, 기대 %q", dom, k, p.attrs[k], w)
+			}
 		}
 	}
 	act := got[mVGPUActive]
@@ -587,8 +619,8 @@ func TestREADMENames(t *testing.T) {
 		t.Fatal(err)
 	}
 	doc := string(b)
-	names := []string{mMapping, mVGPUActive, mProfileFB, mProfileMax, mVGPUInfo, mVGPULicense, mBridgeIPv4,
-		attrVMName, attrVMUUID, attrVMDomain, attrGuestBus, attrGPUType, attrStatus, attrKDriver, attrVendorID, attrDeviceID,
+	names := []string{mMapping, mVMInfo, mVGPUActive, mProfileFB, mProfileMax, mVGPUInfo, mVGPULicense, mBridgeIPv4,
+		attrVMName, attrVMUUID, attrVMDomain, attrVMMAC, attrGuestBus, attrGPUType, attrStatus, attrKDriver, attrVendorID, attrDeviceID,
 		attrVGPUUUID, attrVGPUID, attrVGPUIndex, attrVGPUProf, attrMdevType, attrMdevUUID, attrGIID, attrIfName, attrIfAddr, attrHWParent}
 	for _, m := range vgpuMetrics {
 		names = append(names, m.name)

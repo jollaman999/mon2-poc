@@ -404,7 +404,19 @@ func (s *hvScraper) collectGPU(ctx context.Context, f *toolFinder) ([]point, []e
 		}
 	}
 
-	// 4) 미할당 GPU 와 GPU 마다 활성 vGPU 수. 기존 스크립트 8절.
+	// 4) 실행 중인 도메인마다 VM 정보. 게스트 지표와 잇는 키(uuid, MAC)를 GPU 가 없는 VM 에도 낸다.
+	for _, name := range view.order {
+		dom := view.byName[name]
+		if dom == nil {
+			continue
+		}
+		m := map[string]any{attrSource: "libvirt"}
+		vmAttrs(m, dom.vmName(), dom.UUID, dom.Name)
+		setStr(m, attrVMMAC, strings.Join(dom.macs(), ","))
+		pts = append(pts, point{name: mVMInfo, unit: "1", isInt: true, value: 1, attrs: m})
+	}
+
+	// 5) 미할당 GPU 와 GPU 마다 활성 vGPU 수. 기존 스크립트 8절.
 	for _, a := range sortedAddrs(st.gpus) {
 		g := st.gpus[a]
 		if !assigned[a] && g.InSysfs {

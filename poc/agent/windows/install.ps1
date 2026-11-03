@@ -4,6 +4,7 @@
 #                     [-TlsVerify skip|ca] [-CaFile <사설 CA pem>] [-StartKey <값>]
 # 기준 폴더 C:\cmp-agent 아래: bin(실행 파일) · conf(설정) · data(file_storage 디스크 큐) · logs(에이전트 로그)
 # host.id 는 Win32_ComputerSystemProduct.UUID(소문자)로 덮어쓴다. 하이퍼바이저가 보는 VM uuid 와 같은 값이다. 못 읽으면 넣지 않는다.
+# host.mac 은 물리 NIC MAC 을 소문자 콜론 꼴로 정렬해 쉼표로 이은 것이다. 하이퍼바이저가 보는 VM 의 NIC MAC 목록과 같은 꼴이다.
 # exec · vsphere 수신기와 winpackettrace 의 포트는 설정 파일(conf\config.yaml)에 예시만 있다. 고쳐서 켠다.
 param(
   [Parameter(Mandatory = $true)][string[]]$Nodes,
@@ -44,8 +45,15 @@ if ($TlsVerify -eq "ca") {
 # VM 이면 하이퍼바이저가 붙인 uuid 다. 형식이 uuid 가 아니면(빈 값, 제조사가 채우지 않은 값) 넣지 않는다
 $hostId = ""
 try { $hostId = "$((Get-CimInstance -ClassName Win32_ComputerSystemProduct).UUID)".ToLowerInvariant() } catch { $hostId = "" }
-if ($hostId -match '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') { $hostIdProc = ", resource" }
-else { $hostId = ""; $hostIdProc = "" }
+if ($hostId -notmatch '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') { $hostId = "" }
+# 물리 NIC 만 (VirtIO · 실제 카드). 가상 어댑터와 루프백은 빠진다. Windows 는 FA-16-3E-.. 꼴로 준다
+$hostMac = ""
+try {
+  $hostMac = (@(Get-NetAdapter -Physical | ForEach-Object { "$($_.MacAddress)".ToLowerInvariant() -replace '-', ':' } |
+      Where-Object { $_ -match '^([0-9a-f]{2}:){5}[0-9a-f]{2}$' -and $_ -ne '00:00:00:00:00:00' }) |
+    Sort-Object -Unique) -join ","
+} catch { $hostMac = "" }
+$resourceProc = if ($hostId -or $hostMac) { ", resource" } else { "" }
 
 Write-Output "[1/4] 폴더"
 foreach ($d in $Base, $BinDir, $ConfDir, $DataDir, $LogDir) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
@@ -61,10 +69,14 @@ Invoke-Native { & "$BinDir\$Name.exe" --version }
 Write-Output "[3/4] 설정"
 if ($TlsVerify -eq "ca") { Copy-Item -Force $CaFile "$ConfDir\ca.pem" }
 $cfg = Get-Content -Raw -Encoding UTF8 "$Src\config.yaml.tmpl"
+# 못 읽은 값의 resource 줄을 지운다
+foreach ($drop in @(@{ k = "@HOST_ID@"; v = $hostId }, @{ k = "@HOST_MAC@"; v = $hostMac })) {
+  if (-not $drop.v) { $cfg = (($cfg -split "`n") | Where-Object { -not $_.Contains($drop.k) }) -join "`n" }
+}
 $vals = [ordered]@{
   "@QUEUE_DIR@" = (& $y $DataDir); "@INTERVAL@" = $Interval; "@ENDPOINTS@" = $endpoints; "@START_KEY@" = $StartKey
   "@FAILBACK@" = $Failback; "@TLS@" = $tlsLine; "@LOG_FILE@" = (& $y "$LogDir\$Name.log")
-  "@HOST_ID@" = $hostId; "@HOST_ID_PROC@" = $hostIdProc
+  "@HOST_ID@" = $hostId; "@HOST_MAC@" = $hostMac; "@RESOURCE_PROC@" = $resourceProc
 }
 foreach ($k in $vals.Keys) { $cfg = $cfg.Replace($k, $vals[$k]) }
 $new = "$ConfDir\.config.yaml.new"
@@ -74,7 +86,8 @@ Invoke-Native { & "$BinDir\$Name.exe" validate --config $new }
 if ($LASTEXITCODE -ne 0) { throw "설정 검사 실패: $new" }
 Move-Item -Force $new "$ConfDir\config.yaml"
 $hostIdText = if ($hostId) { $hostId } else { "(없음)" }
-Write-Output "노드 $($list -join ','), 수집 주기 $Interval, 돌아가기 $Failback, TLS $TlsVerify, host.id $hostIdText"
+$hostMacText = if ($hostMac) { $hostMac } else { "(없음)" }
+Write-Output "노드 $($list -join ','), 수집 주기 $Interval, 돌아가기 $Failback, TLS $TlsVerify, host.id $hostIdText, host.mac $hostMacText"
 
 Write-Output "[4/4] 서비스"
 $binPath = "`"$BinDir\$Name.exe`" --config `"$ConfDir\config.yaml`""

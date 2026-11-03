@@ -3,6 +3,7 @@
 KVM/libvirt 하이퍼바이저(OpenStack 컴퓨트 노드 포함)에서 다음을 걷는 OTel Collector 수신기(receiver)다.
 
 - GPU 와 VM 의 매핑: PCI passthrough, vGPU(mdev), MIG 기반 vGPU, 아무 VM 에도 안 붙은 GPU
+- 실행 중인 VM 마다 게스트 지표와 잇는 키 (도메인 uuid, NIC MAC)
 - vGPU 마다 사용률 · 메모리 · 인코더 (`nvidia-smi vgpu -q`)
 - OVS 브리지의 IPv4
 
@@ -25,7 +26,7 @@ receivers:
     nvidia_smi_path: ""
     ovs_vsctl_path: ""
     pci_ids_paths: [/usr/share/hwdata/pci.ids, /usr/share/misc/pci.ids, /usr/share/pci.ids]
-    gpu: true                         # GPU-VM 매핑 · vGPU 지표
+    gpu: true                         # GPU-VM 매핑 · vGPU 지표 · VM 정보
     network: true                     # OVS 브리지 IPv4
 ```
 
@@ -39,7 +40,7 @@ receivers:
 | `ovs_container` | `openvswitch_vswitchd` | ovs-vsctl 을 실행할 컨테이너 이름 (kolla). 없으면 호스트 ovs-vsctl |
 | `virsh_path` · `nvidia_smi_path` · `ovs_vsctl_path` | 빈 값 | 호스트 도구 경로. 비우면 PATH |
 | `pci_ids_paths` | 위 세 곳 | 모델명을 nvidia-smi · `/proc/driver/nvidia` 로 못 얻는 GPU(vfio-pci 에 묶인 것)에 쓴다. 처음 있는 파일 하나만 읽는다 |
-| `gpu` · `network` | `true` | 부분을 끈다. 둘 다 끄면 설정 오류 |
+| `gpu` · `network` | `true` | 부분을 끈다. 둘 다 끄면 설정 오류. VM 정보(`hypervisor.vm.info`)는 virsh 를 읽는 `gpu` 부분이 같이 낸다 |
 
 **도구가 없을 때.** 도구마다 따로 건너뛴다. GPU 가 없는 하이퍼바이저, nvidia-smi 만 없는 호스트, OVS 가 없는 호스트에도
 같은 설정이 깔린다. 도구가 있다 없다가 바뀔 때만 로그를 한 줄 남긴다. 도구는 있는데 실행이 실패하면(virsh 가 libvirtd 에
@@ -74,7 +75,9 @@ receivers:
 7. **passthrough → VM** (`virsh list --name` 의 실행 중 도메인, `<hostdev type='pci'>`). source 주소가 VF 면 부모 카드로 바꾼다.
    1의 GPU 이고 아직 할당으로 안 센 것만 낸다 (같은 부모의 VF 둘이 넘어가도 한 번). 게스트 주소는 그 hostdev 의
    `<address type='pci'>`, 없으면 `00:00.0`. 드라이버가 없으면 `vfio-pci` 로 적는다.
-8. **미할당.** 1의 GPU(sysfs 에서 찾은 것) 중 5 ~ 7에서 할당으로 안 센 것을 값 0 으로 낸다. nvidia-smi · vgpu -q 에만 나오고
+8. **VM 정보.** 7에서 읽은 실행 중 도메인(과 5에서 vGPU 의 VM Name 으로 더 읽은 도메인)마다 `hypervisor.vm.info` 하나. `<interface>` 의 `<mac address>` 를 소문자 콜론 꼴로 바꿔
+   정렬하고 겹친 것을 뺀 뒤 쉼표로 잇는다. GPU 가 없는 VM 도 낸다.
+9. **미할당.** 1의 GPU(sysfs 에서 찾은 것) 중 5 ~ 7에서 할당으로 안 센 것을 값 0 으로 낸다. nvidia-smi · vgpu -q 에만 나오고
    sysfs 에 없는 GPU 는 미할당으로 내지 않는다. 7의 passthrough 도 1의 GPU 만 대상이다.
 
 virsh 는 `docker` → `podman` 순으로 `ps` 에서 `nova_libvirt` 컨테이너를 찾아 `<런타임> exec nova_libvirt virsh` 를 쓰고,
@@ -112,6 +115,26 @@ GPU 한 장(vGPU 면 vGPU 하나)마다 한 포인트. 할당 1, 미할당 0. �
 | `nvidia.vgpu.mdev_type` | mdev 유형 id | `nvidia-232` | vGPU, sysfs 에 있을 때 |
 | `nvidia.mig.gpu_instance_id` | MIG 기반 vGPU 의 GPU Instance ID. accelerator 수신기 GPM 지표의 같은 속성과 잇는다 | `3` | MIG 기반 vGPU |
 | `source` | 매핑을 얻은 곳 | `nvidia-smi`, `mdev-sysfs`, `libvirt`, `sysfs`(미할당) | 늘 |
+
+### VM 정보 `hypervisor.vm.info`
+
+실행 중인 도메인(`virsh list --name`)마다 한 포인트. 값은 늘 1, 단위 `1`, 정수. GPU 가 없는 VM 도 낸다.
+[게스트 지표와 잇는 키](#게스트-지표와-잇는-키)를 VM 하나에 모아 둔 지표다.
+
+| 속성 | 뜻 | 예 | 언제 |
+|---|---|---|---|
+| `hypervisor.vm.name` | OpenStack 인스턴스 이름 (`nova:name`), 없으면 도메인 이름 | `vgpu-linux-test-03` | 늘 |
+| `hypervisor.vm.uuid` | libvirt 도메인 uuid (소문자) | `10000000-0000-4000-8000-000000000007` | 도메인 XML 에 있을 때 |
+| `hypervisor.vm.domain` | libvirt 도메인 이름 | `instance-0000000d` | 늘 |
+| `hypervisor.vm.mac` | 도메인 `<interface>` 의 MAC. 소문자 콜론 꼴을 정렬해 쉼표로 이은 것 | `fa:16:3e:00:00:07`, NIC 둘이면 `fa:16:3e:00:00:0a,fa:16:3e:00:00:0b` | `<interface>` 가 있을 때 |
+| `source` | `libvirt` | | 늘 |
+
+**MAC 을 NIC 마다 한 포인트로 나누지 않고 한 값으로 이은 이유.** 게스트 쪽 `host.mac` 은 리소스 속성이라 게스트마다 값이 하나다.
+PromQL 의 `on(...)` 조인은 레이블 값이 똑같아야 하므로, 양쪽을 같은 규칙(소문자 콜론, 정렬, 쉼표)으로 만든 한 문자열로 맞춘다.
+NIC 마다 나누면 NIC 가 둘 이상인 VM 은 게스트의 한 값과 맞는 포인트가 없다.
+
+매핑 · vGPU 지표에는 MAC 을 붙이지 않는다. VM 하나에 NIC 가 여럿일 수 있어 포인트마다 같은 긴 문자열이 반복되고,
+`hypervisor.vm.uuid` 로 이 지표와 이으면 된다.
 
 ### 물리 GPU
 
@@ -262,7 +285,18 @@ accelerator 수신기의 GPM 지표(`nvidia.gpm.*`)가 (`hw.id` = `hw.parent`, `
 
 ## 게스트 지표와 잇는 키
 
-**VM 의 키는 libvirt 도메인 uuid 다.** OpenStack 에서는 인스턴스 uuid 와 같다. 게스트에서는 SMBIOS system uuid 로 보인다.
+**VM 의 키는 둘이다. 첫째가 libvirt 도메인 uuid, 둘째가 NIC MAC 이다.** uuid 를 게스트가 못 읽는 VM(아래 Windows)이 있어서
+MAC 을 덧붙였다 (사용자 결정). 둘 다 [`hypervisor.vm.info`](#vm-정보-hypervisorvminfo) 한 지표에 있다.
+
+| 하이퍼바이저 쪽 | 게스트 쪽 | 게스트가 읽는 곳 |
+|---|---|---|
+| `hypervisor.vm.uuid` | 리소스 `host.id` | Linux `/sys/class/dmi/id/product_uuid`, Windows `Win32_ComputerSystemProduct.UUID` |
+| `hypervisor.vm.mac` | 리소스 `host.mac` | Linux `/sys/class/net/*/address` (`device` 링크가 있는 NIC), Windows `Get-NetAdapter -Physical` |
+| `hypervisor.guest.pci_bus_id` | `accelerator.pci_bus_id` | (같은 VM 안에서 어느 vGPU 인지) |
+
+### uuid
+
+OpenStack 에서는 도메인 uuid 가 인스턴스 uuid 와 같다. 게스트에서는 SMBIOS system uuid 로 보인다.
 
 확인한 것:
 
@@ -270,24 +304,57 @@ accelerator 수신기의 GPM 지표(`nvidia.gpm.*`)가 (`hw.id` = `hw.parent`, `
 - 같은 도메인의 qemu 명령줄이 `-uuid <도메인 uuid>` 와 `-smbios type=1,...,serial=<도메인 uuid>,uuid=<도메인 uuid>` 다.
   게스트 펌웨어가 받는 SMBIOS Type 1 UUID 가 도메인 uuid 라는 뜻이다.
 
-게스트에서 읽히는 값은 Linux `/sys/class/dmi/id/product_uuid` (root 만 읽힌다, 소문자),
-Windows `Win32_ComputerSystemProduct.UUID` (대문자) 다.
-
+Linux 는 `product_uuid` (root 만 읽힌다, 소문자), Windows 는 `Win32_ComputerSystemProduct.UUID` (대문자) 로 읽힌다.
 `resourcedetection` 의 `system` 감지기가 주는 `host.id` 는 machine-id(Windows 는 `MachineGuid`)라 도메인 uuid 와 다르다.
 그래서 **에이전트 설치 스크립트(`poc/agent/install.sh`, `windows/install.ps1`)가 SMBIOS uuid 를 소문자로 읽어
 `resource` 프로세서로 `host.id` 를 덮어쓴다.** 값을 읽지 못하면 넣지 않는다.
 
-PoC 확인 (2026-11-02):
+### MAC
+
+양쪽 다 **소문자 콜론 꼴(`fa:16:3e:7e:6e:e9`)을 정렬하고 겹친 것을 뺀 뒤 쉼표로 이은 한 문자열**이다. PromQL 에서
+`on(mac)` 처럼 레이블 값이 같아야 이어지므로 한 VM 의 값이 양쪽에서 글자까지 같게 만든다. OpenStack(neutron 포트의 `mac_address`)과
+libvirt 가 쓰는 꼴이 소문자 콜론이라 그것에 맞췄다.
+
+- 하이퍼바이저: 도메인 XML 의 `<interface>` 마다 `<mac address>`. hostdev 로 넘긴 NIC(SR-IOV VF 등)는 `<interface>` 가 아니라 빠진다.
+- Linux 게스트(`install.sh`): `/sys/class/net/<이름>/device` 가 있는 NIC 만. bridge · veth · docker · tun · 루프백은 이 링크가 없어 빠진다.
+- Windows 게스트(`install.ps1`): `Get-NetAdapter -Physical` 의 `MacAddress`(`FA-16-3E-..`)를 소문자 콜론으로 바꾼다.
+
+`resourcedetection` 의 `system` 감지기에도 `host.mac` 이 있지만(v0.164.0, 기본 꺼짐) 쓰지 않는다. 값이 문자열 목록이고,
+semconv 대로 대문자 대시 꼴(`FA-16-3E-..`)이며, 켜져 있는(up) 루프백 아닌 인터페이스를 모두 담아 docker0 · veth 같은
+가상 인터페이스가 섞인다 (contrib `internal/metadataproviders/system/metadata.go` 의 `HostMACs`, `processor/resourcedetectionprocessor/internal/system/system.go` 의 `toIEEERA`).
+이 저장소의 에이전트 빌드에는 값을 바꿀 transform 프로세서도 없다. 그래서 uuid 와 같이 **설치 스크립트가 읽어 `resource` 프로세서로 `host.mac` 을 넣는다.**
+키 이름은 semconv `host.mac` 을 쓰되, 값 꼴은 semconv(대문자 대시 목록)와 다른 위의 한 문자열이다.
+
+주의:
+- 설치할 때 한 번 읽는다. NIC 를 붙이거나 떼면 에이전트를 다시 설치해야 값이 바뀐다 (`host.id` 와 같다).
+- 게스트 안의 bond 는 슬레이브 NIC 의 주소를 bond 주소로 바꾸므로 하이퍼바이저 쪽 목록과 어긋날 수 있다. NIC 가 여럿인 VM 은 `host.id` 를 먼저 쓴다.
+
+### Windows 에서 uuid 가 안 보이는 이유
+
+.162(Windows Server 2025)는 `Win32_ComputerSystemProduct` 가 0개, `Win32_BIOS.SMBIOSPresent` 가 False, `$env:firmware_type` 이 `Legacy` 였다.
+원인은 하이퍼바이저가 주는 SMBIOS 진입점이다. 점프 호스트의 QEMU 8.2.2 + SeaBIOS, 머신 `pc-i440fx-noble` 는 SMBIOS 3.0 진입점(`_SM3_`)만 준다.
+레거시 BIOS 로 부팅한 Windows 는 그것을 읽지 못해 SMBIOS 가 없는 것으로 본다. 근거:
+
+- 같은 하이퍼바이저의 Linux 게스트 .73 에서 `/sys/firmware/dmi/tables/smbios_entry_point` 의 앞 다섯 바이트가 `_SM3_` 다 (Linux 는 3.0 진입점을 읽는다).
+- .73(`instance-0000000d`) 과 .162(`instance-00000006`) 의 도메인 XML 에서 `<sysinfo type='smbios'>` · `<os>` (`machine='pc-i440fx-noble'`, `<smbios mode='sysinfo'/>`) 가
+  uuid · serial 말고는 같다. VM 설정 차이가 아니라 펌웨어 진입점과 Windows 의 조합이다.
+
+uuid 로 이으려면 이미지를 UEFI 로 부팅하거나(`hw_firmware_type=uefi`) 32비트 진입점을 주게 해야 한다 (둘 다 PoC 에서 해 보지 않았다).
+그 전까지 이런 Windows VM 은 MAC 으로 잇는다.
+
+### PoC 확인
+
+2026-11-02 (uuid):
 - .73(Linux, KVM 게스트): 설정의 `host.id` 와 `product_uuid` 가 같다. 지표 · 로그 모두에 붙는다.
 - 노드 A(Rocky 10, OpenStack 인스턴스): `host.id` 가 `openstack server show` 의 id 와 같다.
-- .162(Windows Server 2025): Windows 가 SMBIOS 를 보지 못해(`Win32_ComputerSystemProduct` 0개, `SMBIOSPresent` False) `host.id` 를 넣지 못했다. 이 VM 은 아직 하이퍼바이저 지표와 이을 수 없다 (원인 확인 필요).
 
-그러면 다음 둘이 같은 vGPU 다.
+2026-11-03 (MAC): 두 VM 에 에이전트를 다시 깔고 중앙 노드 A 의 VictoriaMetrics · VictoriaLogs 에서 `host_mac` 을 보고,
+점프 호스트의 `virsh dumpxml` 과 이 수신기 한 주기(정적 빌드 탐침을 한 번 돌림)의 `hypervisor.vm.mac` 과 대조했다.
 
-| 하이퍼바이저 쪽 | 게스트 쪽 |
-|---|---|
-| `hypervisor.vm.uuid` | 리소스 `host.id` |
-| `hypervisor.guest.pci_bus_id` | `accelerator.pci_bus_id` |
+| VM | 도메인 | 게스트 `host.mac` | `virsh dumpxml` `<mac address>` | 수신기 `hypervisor.vm.mac` | `host.id` |
+|---|---|---|---|---|---|
+| .73 Debian 12 | `instance-0000000d` | `fa:16:3e:7e:6e:e9` | `fa:16:3e:7e:6e:e9` | `fa:16:3e:7e:6e:e9` | 도메인 uuid 와 같음 |
+| .162 Windows Server 2025 | `instance-00000006` | `fa:16:3e:9c:e1:4a` | `fa:16:3e:9c:e1:4a` | `fa:16:3e:9c:e1:4a` | 없음 (위 이유) |
 
 ## 시험
 
@@ -295,8 +362,8 @@ PoC 확인 (2026-11-02):
 go vet ./... && go test -race ./... && CGO_ENABLED=0 GOOS=linux go build ./...
 ```
 
-- `TestParseVGPUQuery` · `TestParseDomain`: 실제 표본의 vGPU 8개 블록, 도메인 XML.
-- `TestScrapeT4Host`: 실제 표본 전체(podman 의 `nova_libvirt` · `openvswitch_vswitchd`, T4 2장, vGPU 8개, OVS 브리지)로 한 주기.
+- `TestParseVGPUQuery` · `TestParseDomain`: 실제 표본의 vGPU 8개 블록, 도메인 XML. NIC 여럿인 도메인의 MAC 정규화(대문자 · 대시 · 겹침 · MAC 아닌 값).
+- `TestScrapeT4Host`: 실제 표본 전체(podman 의 `nova_libvirt` · `openvswitch_vswitchd`, T4 2장, vGPU 8개, OVS 브리지)로 한 주기. GPU 없는 VM 까지 VM 정보 9개.
   sysfs 는 그 호스트에서 읽은 값(장치 id, 드라이버, mdev 유형 · 장치 배치)으로 임시 디렉터리에 만든다.
 - `TestScrapeSynthetic`: 표본에 없는 구성을 손으로 만들었다. vfio-pci passthrough, `driver_override`, VF 두 개 passthrough, 활성 vGPU 없는 vGPU GPU,
   MIG 기반 vGPU(사용률 N/A), bare_metal, 이름이 비슷한 컨테이너, GPU 가 아닌 hostdev.

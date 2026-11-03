@@ -121,7 +121,10 @@ bin/install-agent.sh --host root@192.0.2.21 --key <pem> --uninstall
   winpackettrace 를 더하지만 `ports` 가 비어 있어 캡처하지 않는다. exec · vsphere 는 설정 파일에 예시만 있다.
 - **host.id**: 설치 스크립트가 Linux `/sys/class/dmi/id/product_uuid`, Windows `Win32_ComputerSystemProduct.UUID` 를 소문자로 읽어
   resource 프로세서로 덮어쓴다. 하이퍼바이저 수신기의 `hypervisor.vm.uuid` 와 같은 값이라 VM 과 GPU 할당을 잇는다.
-  못 읽으면(SMBIOS 를 내보이지 않는 VM 등) 넣지 않고 resource 를 파이프라인에서 뺀다.
+  못 읽으면(레거시 BIOS 로 부팅한 Windows VM 등) 넣지 않는다.
+- **host.mac**: 같은 설치 스크립트가 NIC MAC(Linux 는 `/sys/class/net/*/device` 가 있는 NIC, Windows 는 `Get-NetAdapter -Physical`)을
+  소문자 콜론 꼴로 정렬해 쉼표로 이어 넣는다. 하이퍼바이저 수신기 `hypervisor.vm.info` 의 `hypervisor.vm.mac` 과 같은 꼴이라
+  `host.id` 가 없는 VM 도 잇는다. 둘 다 못 읽으면 resource 를 파이프라인에서 뺀다 (`agent/hypervisor/README.md` 의 "게스트 지표와 잇는 키").
 - **cmp-gpm**: NVML GPM 을 재는 보조 바이너리 (glibc 동적). 본체를 정적으로 두려고 나눴다. `bin` 에 함께 놓이고 accelerator 가 주기마다 실행한다.
 - **전환 시험**: `checks/agent-failover.sh` 는 1초 샘플이 빠짐없이 있는지 세므로 에이전트를 `--interval 1s` 로 깔고 돌린다. 평상시에 에이전트가 보내는 노드를 찾아 그 노드를 막는다.
 

@@ -23,6 +23,7 @@ const (
 	attrVMName   = "hypervisor.vm.name"   // OpenStack 인스턴스 이름 (nova:name)
 	attrVMUUID   = "hypervisor.vm.uuid"   // libvirt 도메인 uuid = OpenStack 인스턴스 uuid = 게스트 SMBIOS uuid
 	attrVMDomain = "hypervisor.vm.domain" // libvirt 도메인 이름 (instance-0000xxxx)
+	attrVMMAC    = "hypervisor.vm.mac"    // 도메인 NIC MAC 들. 소문자 콜론 꼴을 정렬해 쉼표로 이은 것 = 게스트 host.mac
 	attrGuestBus = "hypervisor.guest.pci_bus_id"
 
 	attrGPUType   = "hypervisor.gpu.type"   // passthrough, vgpu, mig, bare_metal
@@ -45,6 +46,7 @@ const (
 // 지표 이름.
 const (
 	mMapping     = "hypervisor.gpu.mapping"
+	mVMInfo      = "hypervisor.vm.info"
 	mVGPUActive  = "hypervisor.gpu.vgpu.active"
 	mProfileFB   = "nvidia.vgpu.profile.framebuffer"
 	mProfileMax  = "nvidia.vgpu.profile.max_instances"
