@@ -46,6 +46,7 @@
 |---|---|---|
 | `NAME` | `cmp-mon` | 컨테이너 이름 앞말 · compose 프로젝트 이름과 기본 디렉터리 이름 |
 | `SERVICE_USER` | `NAME` | 컨테이너 안 실행 계정(uid · gid). 이미 있으면 만들지 않고 그대로 쓴다. 지울 때(`--purge`)도 우리가 만든 계정만 지운다 |
+| `AM_LOG_LEVEL` | `info` | Alertmanager 로그 수준. 보통 실행할 때 준다 (`AM_LOG_LEVEL=debug bin/deploy-central.sh all`). 알림 중복 같은 원인을 볼 때만 debug 로 올리고 끝나면 빼고 다시 배포한다 |
 | `BASE_DIR` | `/NAME` (기본 `/cmp-mon`) | 모든 것이 이 아래에 있다: `compose`(compose.yaml · `.env` · 부품별 `env/*.env`) · `conf`(설정, `install.env`) · `data`(저장소 데이터와 중계 큐) · `logs`(컨테이너 로그, 50MB 넘으면 비움) |
 
 노드에 까는 패키지는 Podman 과 그 의존성(묶음의 `packages.txt`)과 podman-compose 다. 이미 깔린 패키지는 올리지 않고, 새로 까는 패키지가 더 높은 판을 요구할 때만 그 의존성을 올린다 (PoC 노드에서는 `iptables-libs` 하나). 폴더 구조는 설계 문서 5.5 절.

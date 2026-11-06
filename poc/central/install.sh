@@ -9,6 +9,7 @@
 #   BASE_DIR                  모든 것을 두는 곳 (기본 /NAME). 아래에 compose · conf · data · logs 를 만든다
 #   RETENTION QUEUE_MAX WEBHOOK
 #   TLS_VERIFY                상대 노드 HTTPS 인증서를 skip(기본, 검증 안 함) / ca(묶음의 사설 CA 로 검증)
+#   AM_LOG_LEVEL              Alertmanager 로그 수준 (기본 info, 원인 추적 때 debug)
 # 묶음 안
 #   podman-el10/rpms · whl    Podman RPM(EL10) 과 podman-compose wheel (bin/fetch-podman.sh)
 #   images/*.tar              공식 이미지 (bin/fetch-images.sh)
@@ -153,6 +154,7 @@ VM_VERSION=$VM_VERSION
 VL_VERSION=$VL_VERSION
 VT_VERSION=$VT_VERSION
 AM_VERSION=$AM_VERSION
+AM_LOG_LEVEL=${AM_LOG_LEVEL:-info}
 MODE=$MODE
 SELF=$SELF
 PEER=${PEER:-}

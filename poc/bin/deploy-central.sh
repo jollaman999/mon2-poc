@@ -2,6 +2,7 @@
 # 중앙 노드 A · B 에 묶음(설치 스크립트 · compose · Podman RPM · 이미지)을 올리고 central/install.sh 를 돌린다.
 # 사용: bin/deploy-central.sh [A|B|all]                     설치 (기본 all)
 #       bin/deploy-central.sh uninstall [--purge] [A|B|all] 컨테이너 · 설정 삭제. --purge 면 데이터 · 이미지까지
+#       AM_LOG_LEVEL=debug bin/deploy-central.sh ...           Alertmanager 로그 수준 (기본 info)
 # 미리: cp inventory.example.env inventory.env 후 값 채우기,
 #       bin/fetch-podman.sh <Podman 원본 묶음 폴더>, bin/fetch-images.sh   (dist/podman-el10, dist/images)
 #
@@ -64,6 +65,7 @@ RETENTION=$RETENTION
 QUEUE_MAX=$QUEUE_MAX
 WEBHOOK=${WEBHOOK:-$self:5001}
 TLS_VERIFY=${TLS_VERIFY:-skip}
+AM_LOG_LEVEL=${AM_LOG_LEVEL:-info}
 EOF
   echo "=== $self: 올리는 중 (RPM $(du -sh dist/podman-el10 | cut -f1), 이미지 $(du -sh dist/images | cut -f1))"
   # RPM · 이미지는 이미 압축돼 있어 압축하지 않고, dist/ 를 복사하지 않고 tar 가 바로 읽는다

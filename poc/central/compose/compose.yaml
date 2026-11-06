@@ -138,7 +138,7 @@ services:
       - -c
       - >-
         exec /bin/alertmanager --config.file=${BASE_DIR}/conf/alertmanager.yml
-        --storage.path=${BASE_DIR}/data/alertmanager --web.listen-address=127.0.0.1:9093 $$AM_CLUSTER_ARGS
+        --storage.path=${BASE_DIR}/data/alertmanager --web.listen-address=127.0.0.1:9093 --log.level=${AM_LOG_LEVEL:-info} $$AM_CLUSTER_ARGS
     volumes:
       - ${BASE_DIR}/conf:${BASE_DIR}/conf:ro,z
       - ${BASE_DIR}/data/alertmanager:${BASE_DIR}/data/alertmanager:z
