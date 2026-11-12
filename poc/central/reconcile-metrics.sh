@@ -42,9 +42,11 @@ m=$(( now - from_min * 60 )); last=$(( now - to_min * 60 ))
 copied=0; checked=0
 while [ "$m" -lt "$last" ]; do
   end=$(( m + 60 ))
-  l=$(local_q "$end" 2>/dev/null | num); p=$(peer_q "$end" 2>/dev/null | num)
-  [ -n "$p" ] || { echo "상대 노드 조회 실패 ($(hm "$end")), 이번 회차는 건너뛴다"; exit 0; }
-  l=${l:-0}; checked=$(( checked + 1 ))
+  # 응답이 성공인데 결과가 비면 그 분의 샘플이 0개라는 뜻이다 (설치 직후처럼). 조회 자체가 실패했을 때만 건너뛴다
+  pr=$(peer_q "$end" 2>/dev/null || true)
+  case "$pr" in *'"status":"success"'*) ;; *) echo "상대 노드 조회 실패 ($(hm "$end")), 이번 회차는 건너뛴다"; exit 0 ;; esac
+  l=$(local_q "$end" 2>/dev/null | num); p=$(echo "$pr" | num)
+  l=${l:-0}; p=${p:-0}; checked=$(( checked + 1 ))
   if [ "$p" -gt "$l" ]; then
     echo "$(hm "$m")~$(hm "$end") 로컬 $l < 상대 $p: 상대에서 복사"
     /vmctl-prod vm-native -s --vm-native-src-addr="https://$PEER:7443/vmlocal" \
