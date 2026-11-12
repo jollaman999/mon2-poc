@@ -66,6 +66,7 @@ QUEUE_MAX=$QUEUE_MAX
 WEBHOOK=${WEBHOOK:-$self:5001}
 TLS_VERIFY=${TLS_VERIFY:-skip}
 AM_LOG_LEVEL=${AM_LOG_LEVEL:-info}
+OTEL_PROMETHEUS_NAMING=${OTEL_PROMETHEUS_NAMING:-true}
 EOF
   echo "=== $self: 올리는 중 (RPM $(du -sh dist/podman-el10 | cut -f1), 이미지 $(du -sh dist/images | cut -f1))"
   # RPM · 이미지는 이미 압축돼 있어 압축하지 않고, dist/ 를 복사하지 않고 tar 가 바로 읽는다

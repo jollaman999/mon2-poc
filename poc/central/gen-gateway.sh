@@ -5,8 +5,10 @@
 # vmauth 하나가 4318 · 8443 · 7443 을 모두 받는다. 설정이 하나라 경로가 세 포트에 다 열리므로,
 # 경로를 누가 쓸 수 있는지는 토큰(Authorization: Bearer)으로 가른다 (설계 문서 5.2 절).
 #   토큰 없음         수집     /v1/metrics · /v1/logs · /v1/traces · /api/v1/write → 로컬 중계, 죽으면 상대 :7443
-#   조회 토큰         조회     /metrics · /logs · /traces 앞말을 떼고 → 로컬 저장소, 죽으면 상대 :7443
-#   노드 사이 토큰    노드 사이 /vm /vl /vt /vmagent /vlagent /vtagent /am 앞말을 떼고 → 로컬 부품
+#   조회 토큰         조회     /metrics · /logs · /traces 앞말을 떼고 → 로컬 조회 부품, 죽으면 상대 :7443
+#                              (/metrics 는 vmselect: 두 노드 vmstorage 를 합쳐 읽는다)
+#   노드 사이 토큰    노드 사이 /vm(vmselect) /vmlocal(로컬 vmstorage 만 읽는 vmselect) /vminsert /vl /vt
+#                              /vmagent /vlagent /vtagent /am 앞말을 떼고 → 로컬 부품
 # 상대 노드로 넘길 때는 노드 사이 토큰을 붙인다. 로컬 부품은 토큰을 보지 않는다.
 set -euo pipefail
 out=$1; peer=${2:-}; peer_token=$3; query_token=$4
@@ -35,21 +37,23 @@ umask 027
   echo "    bearer_token: \"$query_token\""
   echo "    url_map:"
   # vmalert 는 데이터소스를 /metrics 하나로 쓰므로 로그 규칙(/metrics/select/logsql/...)을 먼저 VictoriaLogs 로 보낸다
-  route "/metrics/select/logsql/.*" 1 "http://127.0.0.1:9428"  "/vl"
-  route "/metrics/.*"               1 "http://127.0.0.1:8428"  "/vm"
-  route "/logs/.*"                  1 "http://127.0.0.1:9428"  "/vl"
-  route "/traces/.*"                1 "http://127.0.0.1:10428" "/vt"
+  route "/metrics/select/logsql/.*" 1 "http://127.0.0.1:9428"                      "/vl"
+  route "/metrics/.*"               1 "http://127.0.0.1:8481/select/0/prometheus" "/vm"
+  route "/logs/.*"                  1 "http://127.0.0.1:9428"                      "/vl"
+  route "/traces/.*"                1 "http://127.0.0.1:10428"                     "/vt"
   if [ -n "$peer" ]; then
     echo "  - name: peer"
     echo "    bearer_token: \"$peer_token\""
     echo "    url_map:"
-    route "/vm/.*"      1 "http://127.0.0.1:8428"
-    route "/vl/.*"      1 "http://127.0.0.1:9428"
-    route "/vt/.*"      1 "http://127.0.0.1:10428"
-    route "/vmagent/.*" 1 "http://127.0.0.1:8429"
-    route "/vlagent/.*" 1 "http://127.0.0.1:9429"
-    route "/vtagent/.*" 1 "http://127.0.0.1:10429"
-    route "/am/.*"      1 "http://127.0.0.1:9093"
+    route "/vm/.*"       1 "http://127.0.0.1:8481/select/0/prometheus"
+    route "/vmlocal/.*"  1 "http://127.0.0.1:8491/select/0/prometheus"
+    route "/vminsert/.*" 1 "http://127.0.0.1:8480"
+    route "/vl/.*"       1 "http://127.0.0.1:9428"
+    route "/vt/.*"       1 "http://127.0.0.1:10428"
+    route "/vmagent/.*"  1 "http://127.0.0.1:8429"
+    route "/vlagent/.*"  1 "http://127.0.0.1:9429"
+    route "/vtagent/.*"  1 "http://127.0.0.1:10429"
+    route "/am/.*"       1 "http://127.0.0.1:9093"
   fi
   echo "unauthorized_user:"
   echo "  url_map:"

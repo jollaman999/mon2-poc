@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # 새 에이전트(cmp-otelcol) 지표를 PromQL 로 조회해 결과가 있는지, 두 노드 값이 같은지 표로 낸다.
 # 사용: checks/promql-check.sh                    노드 A · B 의 조회 입구(:8443/metrics, 조회 토큰)로 조회
-#       checks/promql-check.sh --url <주소>       토큰 없이 그 VictoriaMetrics 하나에 조회 (예: http://127.0.0.1:8428)
+#       checks/promql-check.sh --url <주소>       토큰 없이 그 조회 주소에 바로 (예: http://127.0.0.1:8481/select/0/prometheus)
 #       ONLY=<정규식> checks/promql-check.sh ...  이름이 맞는 쿼리만 (예: ONLY=join)
 #       checks/promql-check.sh seed <주소>        하이퍼바이저 조인 시험용 가짜 시계열을 그 주소의 /api/v1/import 로 넣는다
 #       checks/promql-check.sh print              쿼리 목록만 낸다
 #
-# - 이름은 VictoriaMetrics -opentelemetry.usePrometheusNaming 을 거친 저장 이름이다 (README 9.3).
+# - 이름은 vmagent -opentelemetry.usePrometheusNaming 을 거친 저장 이름이다 (OTEL_PROMETHEUS_NAMING=true, README 9.3).
 # - 두 노드에 같은 시각(time=지금-60초)으로 묻는다. 값 차이는 시계열마다 상대 차이의 최댓값이다.
 # - 기대가 "값" 인 쿼리가 비거나 두 노드가 1% 넘게 다르면 종료 코드 1.
 #   "XID" 는 XID 가 없으면 비는 것이 정상이고, "조인" 은 하이퍼바이저 수신기가 없으면 빈다 (--url 이면 값이 있어야 한다).

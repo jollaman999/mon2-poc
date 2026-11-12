@@ -16,7 +16,7 @@
 | `central/conf/` | Alertmanager 설정, vmalert 규칙(`rules/poc.yml` 알림 경로 확인용, `rules/agent.yml` 에이전트 지표 알림), 자체 감시 scrape |
 | `central/gen-gateway.sh` | vmauth 입구 설정(경로 · 토큰)을 만든다 |
 | `central/uninstall.sh` | 지우기 (`bin/deploy-central.sh uninstall [--purge]`). 기본은 데이터를 남긴다 |
-| `central/reconcile-metrics.sh` | 주기 대조(메트릭). 두 노드의 1분 단위 샘플 수를 비교해 상대에만 있는 분을 복사한다. `cmp-mon-reconcile` 컨테이너(공식 vmctl 이미지)가 5분마다 돌린다 (이중화일 때만) |
+| `central/reconcile-metrics.sh` | 주기 대조(메트릭). 두 노드 vmstorage 의 1분 단위 샘플 수를 비교해(`vmselect-local` 로 센다) 상대에만 있는 분을 로컬 vminsert 로 복사한다. `cmp-mon-reconcile` 컨테이너(공식 vmctl 이미지)가 5분마다 돌린다 (이중화일 때만) |
 | `Makefile` | `make agent`(OCB 빌드) · `agent-package`(에이전트 묶음) · `test`(에이전트 Go 모듈 시험) · `central-bundle SRC=<원본 묶음 폴더>`(중앙 묶음) · `clean` |
 | `agent/` | 에이전트 `cmp-otelcol`. 부품(Go 모듈)마다 폴더 하나(`cmpotlp/` 는 주소 목록 출력), `builder-config.yaml` 은 OCB 부품 목록, `config.yaml.tmpl` 은 Linux 설정 틀, `install.sh` · `uninstall.sh` · `systemd/` 는 Linux 설치, `windows/` 는 Windows 설치와 설정 틀 |
 | `bin/install-agent.sh` | 에이전트 묶음을 대상 VM 에 올려 설치 · 삭제한다 (Linux 는 SSH, Windows 는 WinRM) |
@@ -29,16 +29,22 @@
 
 ## 중앙 노드에 깔리는 것
 
-바깥에 여는 포트는 vmauth 의 4318(수집) · 8443(조회) · 7443(노드 사이, 모두 HTTPS)과 Alertmanager 클러스터 9094(TCP · UDP) 뿐이다. 단일 노드면 4318 · 8443 만 연다. 나머지는 모두 `127.0.0.1` 에서만 듣는다.
+바깥에 여는 포트는 vmauth 의 4318(수집) · 8443(조회) · 7443(노드 사이, 모두 HTTPS)과 Alertmanager 클러스터 9094(TCP · UDP), 그리고 이중화일 때 vmstorage 의 8401(상대 노드 vmselect 가 읽는 길, 평문 · 인증 없음)이다. 8401 은 firewalld 의 rich rule 로 상대 노드 IP 출발지만 받는다 (firewalld 가 꺼져 있으면 설치가 경고만 낸다. 그때는 다른 방화벽 · 보안그룹에서 상대 노드에만 연다). 단일 노드면 4318 · 8443 만 연다. 나머지는 모두 `127.0.0.1` 에서만 듣는다.
 
 | 부품 | 컨테이너 (이미지) | 포트 |
 |---|---|---|
 | vmauth 입구 | `cmp-mon-gateway` (`victoriametrics/vmauth`) | 4318 · 8443 · 7443 (노드 IP, HTTPS). 내부 127.0.0.1:8427 |
-| VictoriaMetrics · VictoriaLogs · VictoriaTraces | `cmp-mon-victoria-*` (`victoriametrics/victoria-*`) | 127.0.0.1:8428 · 9428 · 10428 |
+| 메트릭 저장 vmstorage | `cmp-mon-vmstorage` (`victoriametrics/vmstorage:<판>-cluster`) | 127.0.0.1:8482(상태 · 지표) · 127.0.0.1:8400(vminsert 가 씀). vmselect 가 읽는 8401 은 단일이면 127.0.0.1, 이중화면 노드 IP |
+| 메트릭 쓰기 vminsert | `cmp-mon-vminsert` (`victoriametrics/vminsert:<판>-cluster`) | 127.0.0.1:8480. 로컬 vmstorage 에만 쓴다 (상대 노드 사본은 vmagent 가 상대 노드 `:7443/vminsert` 로 보낸다) |
+| 메트릭 조회 vmselect | `cmp-mon-vmselect` (`victoriametrics/vmselect:<판>-cluster`) | 127.0.0.1:8481. 이중화면 두 노드 vmstorage 를 합쳐 읽고 겹친 샘플은 하나로 합친다 (`-dedup.minScrapeInterval=1ms`). 한쪽 저장소가 죽으면 남은 쪽으로 답하고 `isPartial: true` 를 붙인다 |
+| 노드별 조회 vmselect-local | `cmp-mon-vmselect-local` (같은 이미지, 이중화일 때만) | 127.0.0.1:8491. 로컬 vmstorage 만 읽는다. 주기 대조 · 시험 스크립트가 노드별 샘플 수를 센다 |
+| VictoriaLogs · VictoriaTraces | `cmp-mon-victoria-*` (`victoriametrics/victoria-*`) | 127.0.0.1:9428 · 10428 |
 | vmagent · vlagent · vtagent | `cmp-mon-vmagent` 등 (`victoriametrics/vmagent` 등) | 127.0.0.1:8429 · 9429 · 10429 |
 | vmalert | `cmp-mon-vmalert` (`victoriametrics/vmalert`) | 127.0.0.1:8880 |
 | Alertmanager | `cmp-mon-alertmanager` (`prom/alertmanager`) | 127.0.0.1:9093, 노드 IP:9094 |
-| 주기 대조 | `cmp-mon-reconcile` (`victoriametrics/vmctl`, 5분마다, 이중화일 때만) | 상대 노드 :7443/vm 을 읽는다 |
+| 주기 대조 | `cmp-mon-reconcile` (`victoriametrics/vmctl`, 5분마다, 이중화일 때만) | 상대 노드 `:7443/vmlocal` 을 읽어 로컬 vminsert 에 넣는다 |
+
+**조회 경로**: 조회 입구 `:8443/metrics/...` 는 앞말을 떼고 로컬 vmselect `/select/0/prometheus` 로 넘긴다 (죽었으면 상대 노드 `:7443/vm`). 이중화면 vmselect 가 두 노드를 합쳐 읽으므로, 한쪽 저장소에만 빈 구간이 있어도(중계 큐 한도를 넘어 버려진 구간 등) 다른 노드에 그 구간이 있으면 조회 결과에는 빈틈이 없다. vmselect 의 `/select/0/prometheus` 아래에는 `/health` 가 없어 상태 확인은 `/metrics/api/v1/status/buildinfo` 로 한다. 노드 사이 입구 `:7443` 의 메트릭 경로는 `/vm`(vmselect) · `/vmlocal`(vmselect-local) · `/vminsert`.
 
 **이름 · 경로 · 계정** (`inventory.env`, 비우면 기본값)
 
@@ -46,6 +52,7 @@
 |---|---|---|
 | `NAME` | `cmp-mon` | 컨테이너 이름 앞말 · compose 프로젝트 이름과 기본 디렉터리 이름 |
 | `SERVICE_USER` | `NAME` | 컨테이너 안 실행 계정(uid · gid). 이미 있으면 만들지 않고 그대로 쓴다. 지울 때(`--purge`)도 우리가 만든 계정만 지운다 |
+| `OTEL_PROMETHEUS_NAMING` | `true` | vmagent 가 OTLP 메트릭 이름을 Prometheus 꼴로 바꿔 저장할지 (`-opentelemetry.usePrometheusNaming`). `true` 면 `system.cpu.time` → `system_cpu_time_seconds_total`, 라벨 `host.name` → `host_name`. `false` 면 수집기가 보낸 이름 그대로 저장한다 |
 | `AM_LOG_LEVEL` | `info` | Alertmanager 로그 수준. 보통 실행할 때 준다 (`AM_LOG_LEVEL=debug bin/deploy-central.sh all`). 알림 중복 같은 원인을 볼 때만 debug 로 올리고 끝나면 빼고 다시 배포한다 |
 | `BASE_DIR` | `/NAME` (기본 `/cmp-mon`) | 모든 것이 이 아래에 있다: `compose`(compose.yaml · `.env` · 부품별 `env/*.env`) · `conf`(설정, `install.env`) · `data`(저장소 데이터와 중계 큐) · `logs`(컨테이너 로그, 50MB 넘으면 비움) |
 
@@ -59,7 +66,7 @@
 
 ## 단일 노드 · 이중화
 
-- `NODE_B` 를 비우면 단일 노드다. 중계는 로컬 저장소에만 쓰고, vmauth 에서 상대 노드 경로가 빠지고, Alertmanager 는 클러스터를 맺지 않고, 주기 대조 컨테이너는 띄우지 않는다.
+- `NODE_B` 를 비우면 단일 노드다. 중계는 로컬 저장소에만 쓰고, vmselect 는 로컬 vmstorage 만 읽고(8401 도 127.0.0.1 에서만 듣는다), vmauth 에서 상대 노드 경로가 빠지고, Alertmanager 는 클러스터를 맺지 않고, 주기 대조 · vmselect-local 컨테이너는 띄우지 않는다.
 - **단일 → 이중화**: `NODE_B` 를 채우고 `bin/deploy-central.sh all`. 새 노드에는 그 시점부터 데이터가 쌓이므로, 과거 메트릭은 `bin/backfill-metrics.sh A <시작시각>` 으로 채운다.
 - **이중화 → 단일**: `NODE_B` 를 비우고 `bin/deploy-central.sh A`. 상대 노드로 보내던 큐는 지운다. 노드 B 는 `bin/deploy-central.sh uninstall --purge B` 로 지운다 (`NODE_B` 를 비우기 전에).
 

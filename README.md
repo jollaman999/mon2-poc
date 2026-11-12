@@ -13,7 +13,7 @@
 | 질문 | 답 |
 |---|---|
 | 무엇을 만드나 | 노드 2대가 똑같은 일을 하는 모니터링 백엔드. 메트릭은 VictoriaMetrics, 로그는 VictoriaLogs, 트레이스는 VictoriaTraces |
-| 양쪽 저장소는 어떻게 같아지나 | 노드마다 있는 **Victoria 중계 에이전트(vmagent · vlagent · vtagent)가 양쪽 저장소에 똑같이 기록**한다. 한쪽이 죽으면 그쪽 몫을 디스크에 쌓았다가 돌아오면 보낸다 (4절) |
+| 양쪽 저장소는 어떻게 같아지나 | 노드마다 있는 **Victoria 중계 에이전트(vmagent · vlagent · vtagent)가 양쪽 저장소에 똑같이 기록**한다. 한쪽이 죽으면 그쪽 몫을 디스크에 쌓았다가 돌아오면 보낸다 (4절). 메트릭은 조회할 때 vmselect 가 두 노드 저장소를 합쳐 읽어 한쪽에만 빈 구간을 메운다 (5.3) |
 | 에이전트는 | **OCB 로 만든 커스텀 OpenTelemetry Collector** 하나. 공식 부품에 없는 기능(GPU · NPU 수집, 로그 원천 자동 선택, Windows 패킷 트레이스, vSphere, 하이퍼바이저의 GPU-VM 매핑, 노드 전환 출력)은 자체 부품으로 만든다 (3.5, 8절) |
 | 중계를 OTel Collector 가 아니라 Victoria 에이전트로 하는 이유 | 기존 Prometheus(remote_write · scrape)와 Influx · Loki 형식 수집기를 받는 입구가 **Victoria 쪽에서는 기본 기능이고 OTel 쪽에서는 alpha** 다. 큐를 바이트 단위로 보고 남은 양으로 조회 복귀를 정하는 공식 HA 절차가 있다 (3.4) |
 | VIP 는 | **쓰지 않는다.** VIP 는 같은 L2 대역 안에서만 넘어간다. 대신 **에이전트가 노드 주소를 모두 알고, 그중 한 곳에만** 보낸다. 시작 주소는 호스트 이름으로 정해 에이전트마다 나뉘고, 실패하면 목록의 다음 주소로 보낸다. 노드마다 입구 프록시(vmauth)가 있어 로컬 부품이 죽으면 상대 노드로 넘긴다 (3.3, 3.10) |
@@ -59,7 +59,7 @@
 | 수집 | OCB 에이전트 (서버마다 하나), OBI(eBPF 트레이스, 별도 프로세스), 중앙 vSphere 수집기 | 각 서버, 중앙 |
 | 진입 | vmauth 하나가 입구 3개(수집 4318 · 조회 8443 · 노드 사이 7443)를 HTTPS 로 받음 | 노드 A · B 각각 |
 | 중계 | vmagent · vlagent · vtagent | 노드 A · B 각각, 양쪽 저장소에 기록 |
-| 저장 | VictoriaMetrics · VictoriaLogs · VictoriaTraces | 노드 A · B 각각, 같은 내용 |
+| 저장 | 메트릭은 VictoriaMetrics 클러스터판 부품(vmstorage · vminsert · vmselect), 로그 · 트레이스는 VictoriaLogs · VictoriaTraces 단일판 | 노드 A · B 각각, 같은 내용. 메트릭 조회(vmselect)는 두 노드 vmstorage 를 합쳐 읽는다 |
 | 알림 | vmalert, Alertmanager (클러스터) | 노드 A · B 각각 |
 | 조회 · 관리 | 관리 서버 (Prometheus API · LogsQL · Jaeger API 로 조회) | 별도 |
 
@@ -251,7 +251,7 @@
 
 **Grafana 를 쓰지 않는 이유**
 - 알림을 Grafana 로 평가하면 관리 서버가 조직 · 폴더 · contact point · 정책 · 규칙을 Grafana API 로 맞춰야 하고, 2노드면 Grafana 도 2대라 규칙 동기화가 또 필요하다.
-- 3축(메트릭 · 로그 · 트레이스) 화면은 관리 서버가 그린다. 저장소마다 내장 UI 도 있다: 메트릭은 vmui(`:8428/vmui`), 로그는 VictoriaLogs UI(`:9428/select/vmui`), 트레이스는 VTUI(`:10428/select/vmui`, v0.12.0 부터). **셋을 한 화면에 묶은 공식 UI 는 찾지 못했다.** 운영자가 직접 들여다볼 때는 내장 UI 로 충분하다.
+- 3축(메트릭 · 로그 · 트레이스) 화면은 관리 서버가 그린다. 저장소마다 내장 UI 도 있다: 메트릭은 vmui(vmselect `:8481/select/0/vmui`), 로그는 VictoriaLogs UI(`:9428/select/vmui`), 트레이스는 VTUI(`:10428/select/vmui`, v0.12.0 부터). **셋을 한 화면에 묶은 공식 UI 는 찾지 못했다.** 운영자가 직접 들여다볼 때는 내장 UI 로 충분하다.
 - Grafana 는 AGPL-3.0(v8.0.0 부터)이다.
 
 **구성**
@@ -349,7 +349,7 @@
 
 ![노드가 늘어날 때](figures/22-scale-out.svg)
 
-**2대일 때는 한 VM 에 모든 역할을 둔다** (지금 PoC). 노드마다 입구(vmauth), 중계, 저장소, 알림이 다 있고 저장소는 단일판이다. 노드마다 전체 사본이라 저장 부하는 나뉘지 않는다(3.11).
+**2대일 때는 한 VM 에 모든 역할을 둔다** (지금 PoC). 노드마다 입구(vmauth), 중계, 저장소, 알림이 다 있다. 메트릭 저장소는 클러스터판 부품(vmstorage · vminsert · vmselect)을 노드마다 한 벌씩 두지만 vminsert 는 로컬 vmstorage 에만 쓴다(`-replicationFactor` 를 쓰지 않음). 사본은 지금처럼 중계가 만들고, vmselect 만 두 노드를 합쳐 읽는다 (5.3). 로그 · 트레이스 저장소는 단일판이다. 노드마다 전체 사본이라 저장 부하는 나뉘지 않는다(3.11).
 
 **한 대로 감당이 안 되면 역할을 층으로 나눈다.** 같은 Victoria 바이너리를 층별 VM 에 나눠 놓는 것이다.
 
@@ -358,7 +358,7 @@
 | 입구층 | vmauth + vminsert(메트릭) + vlagent · vtagent(로그 · 트레이스) | 받는 양에 맞춰 | 에이전트가 이 중 한 곳에 보낸다. 상태(데이터)를 갖지 않아 어느 것이 받아도 같다 |
 | 저장층 (메트릭) | vmstorage M 대 | 디스크 · 메모리에 맞춰 | vminsert 가 `-replicationFactor=2` 로 시계열마다 **M 대 중 2대**에 쓴다. 대수를 늘리면 한 대가 맡는 양이 2/M 으로 준다 |
 | 저장층 (로그 · 트레이스) | vlstorage · vtstorage 그룹 2개 | 그룹마다 N 대 | 로그 · 트레이스 클러스터는 복제를 하지 않고 나눠 저장만 한다(VictoriaLogs 문서). 그래서 서로 독립된 그룹 2개를 두고 중계가 그룹마다 사본을 하나씩 쓴다 |
-| 조회층 | vmselect · vlselect · vtselect | 조회량에 맞춰 | vmselect 는 vmstorage 전부를 읽고 겹친 사본을 하나로 합친다. 로그 · 트레이스는 한 그룹을 읽고, 죽으면 다른 그룹을 읽는다 |
+| 조회층 | vmselect · vlselect · vtselect | 조회량에 맞춰 | vmselect 는 vmstorage 전부를 읽고 겹친 사본을 하나로 합친다 (2대 PoC 에서도 이미 이렇게 읽는다). 로그 · 트레이스는 한 그룹을 읽고, 죽으면 다른 그룹을 읽는다 |
 
 **언제 나누나 - 재서 정한다**
 - Victoria 문서는 **"단일판부터 쓰고, 한계에 닿으면 클러스터로"** 를 권한다. 단일판도 자원에 비례해 커지고(수직 확장), 문서의 사례에는 단일판 한 대가 초당 150만 샘플 · 활성 시계열 5천만을 받는 것이 있다. 클러스터는 부품이 나뉘는 만큼 복잡하고 자원을 더 쓴다.
@@ -374,6 +374,7 @@
 - 양쪽을 합쳐 읽는 vmselect 는 보낸 24,100 샘플을 모두 돌려줬다. 죽어 있는 동안은 "일부만 조회됨"(`isPartial: true`) 표시가 붙었다.
 - 죽었던 저장 노드만 읽으면 16,000 이었고 3분 뒤에도 같았다. **vminsert 는 죽은 저장 노드 몫을 쌓아 두지 않고, 돌아와도 채우지 않는다.** 빈틈은 조회할 때 다른 사본으로 메워 보일 뿐이다.
 - 그래서 사본 하나가 빈 채로 다른 사본까지 잃으면 그 구간이 드러난다. 저장층을 나눈 뒤의 보충 방식은 따로 정한다 (확인 필요).
+- 2대 PoC 는 이 합쳐 읽기만 가져왔다. 쓰기는 vminsert 복제 대신 중계(큐로 빈 구간을 채움)가 하고, 한 노드에만 남은 빈 구간은 주기 대조가 채운다 (7.2). 같은 판으로 로컬 docker 에서 다시 본 결과(2026-11-12): 3 시계열 × 114 샘플을 A 에 다 쓰고 B 에는 4분(시계열마다 24 샘플)을 빼고 썼더니, 합쳐 읽는 vmselect 는 342 (= 한 벌, 중복 없음), B 만 읽으면 270 이었다. B 의 vmstorage 를 멈추자 합쳐 읽는 vmselect 는 342 에 `isPartial: true` 를 붙여 답했다.
 
 ---
 
@@ -400,7 +401,7 @@
 | 무엇 | 동작 |
 |---|---|
 | 들어오는 OTLP | 세 중계 모두 OTLP/HTTP 를 받는다. **gRPC 는 vtagent 만** 문서로 확인했다. 그래서 에이전트는 OTLP/HTTP 로 보낸다 |
-| 메트릭 이름 | 기본은 OTel 이름(점 포함) 그대로다. `-opentelemetry.usePrometheusNaming` 을 주면 `process.cpu.time` → `process_cpu_time_seconds_total` 처럼 바꾼다. 이 설계는 켠다 (9.2 에서 Prometheus 와 이름을 맞추기 위해) |
+| 메트릭 이름 | 기본은 OTel 이름(점 포함) 그대로다. `-opentelemetry.usePrometheusNaming` 을 주면 `process.cpu.time` → `process_cpu_time_seconds_total` 처럼 바꾼다. 이 설계는 켠다 (9.2 에서 Prometheus 와 이름을 맞추기 위해). PoC 는 설정값 `OTEL_PROMETHEUS_NAMING`(기본 `true`)으로 끌 수 있다. 끄면 수집기가 보낸 이름(`system.cpu.time`, 라벨 `host.name`) 그대로 저장한다 |
 | resource 속성 | 메트릭은 기본으로 전부 라벨이 된다. `-opentelemetry.promoteResourceAttributes` 등으로 고른다. 로그는 전부 스트림 필드가 되고 `VL-Stream-Fields` 헤더로 바꾼다. 트레이스는 확인 필요 |
 | delta 지표 | VictoriaMetrics v1.132.0 부터 그대로 저장한다. 문서는 누적값으로 바꿔 보내라고 권한다. 에이전트에서 누적값으로 바꿀 `deltatocumulative` 는 PoC 빌드에는 아직 없다 (필요하면 contrib deltatocumulative 프로세서를 넣는다) |
 
@@ -443,21 +444,26 @@
 
 ![노드마다 같은 포트 지도](figures/05-port-map.svg)
 
-**vmauth 하나가 바깥 포트 셋을 HTTPS 로 받는다.** 나머지 부품은 모두 `127.0.0.1` 에서만 듣는다. 두 노드의 설정이 같고, 다른 것은 자기 주소와 상대 주소뿐이다.
+**vmauth 하나가 바깥 포트 셋을 HTTPS 로 받는다.** 나머지 부품은 모두 `127.0.0.1` 에서만 듣는다. 예외는 이중화일 때 상대 노드 vmselect 가 읽는 vmstorage 8401 하나다 (7.2). 두 노드의 설정이 같고, 다른 것은 자기 주소와 상대 주소뿐이다.
 
 | 바깥 포트 | 누가 쓰나 | 경로 → 부품 | 필요한 토큰 | 방화벽에서 열 출발지 |
 |---|---|---|---|---|
 | **4318** 수집 | 에이전트 · 앱 · 기존 Prometheus | `/v1/metrics` → vmagent, `/v1/logs` → vlagent, `/v1/traces` → vtagent, `/api/v1/write` → vmagent | 없음 | 에이전트가 있는 대역 |
-| **8443** 조회 | 관리 서버 · vmalert | `/metrics/...` → VictoriaMetrics, `/logs/...` → VictoriaLogs, `/traces/...` → VictoriaTraces (앞말을 떼고 넘긴다) | 조회 토큰 | 관리 서버 |
-| **7443** 노드 사이 | 상대 노드만 | `/vm` · `/vl` · `/vt` → 저장소, `/vmagent` · `/vlagent` · `/vtagent` → 중계, `/am` → Alertmanager | 노드 사이 토큰 | 상대 노드 |
+| **8443** 조회 | 관리 서버 · vmalert | `/metrics/...` → vmselect, `/logs/...` → VictoriaLogs, `/traces/...` → VictoriaTraces (앞말을 떼고 넘긴다) | 조회 토큰 | 관리 서버 |
+| **7443** 노드 사이 | 상대 노드만 | `/vm` → vmselect, `/vmlocal` → vmselect-local, `/vminsert` → vminsert, `/vl` · `/vt` → 저장소, `/vmagent` · `/vlagent` · `/vtagent` → 중계, `/am` → Alertmanager | 노드 사이 토큰 | 상대 노드 |
+| **8401** 저장소 조회 (이중화만) | 상대 노드의 vmselect | vmselect → vmstorage 의 RPC. **평문 · 인증 없음**이라 vmauth 를 거치지 못한다 | - | 상대 노드만 (firewalld rich rule) |
 | **9094** (TCP · UDP) | 상대 Alertmanager | Alertmanager 클러스터 상태 맞추기. UDP 라 vmauth 로 묶지 않는다 | - | 상대 노드 |
 
 **노드 안에서만 쓰는 포트** (`127.0.0.1`)
 
 | 부품 | 포트 | 하는 일 |
 |---|---|---|
-| VictoriaMetrics · VictoriaLogs · VictoriaTraces | 8428 · 9428 · 10428 | 저장 · 조회 |
-| vmagent · vlagent · vtagent | 8429 · 9429 · 10429 | 중계. 로컬 저장소와 상대 노드 `:7443/vm` 등에 복제 |
+| vmstorage | 8482 (상태 · 지표), 8400 (vminsert 가 씀), 8401 (vmselect 가 읽음. 이중화면 노드 IP 에서 듣는다) | 메트릭 저장 |
+| vminsert | 8480 | 메트릭 쓰기. 로컬 vmstorage 에만 쓴다 |
+| vmselect | 8481 | 메트릭 조회. 이중화면 두 노드 vmstorage 를 합쳐 읽는다 |
+| vmselect-local (이중화만) | 8491 | 로컬 vmstorage 만 읽는 조회. 주기 대조가 노드별 샘플 수를 센다 |
+| VictoriaLogs · VictoriaTraces | 9428 · 10428 | 저장 · 조회 |
+| vmagent · vlagent · vtagent | 8429 · 9429 · 10429 | 중계. 로컬 저장소와 상대 노드 `:7443/vminsert` · `/vl` · `/vt` 에 복제 |
 | vmalert | 8880 | 규칙 평가. 데이터소스 `https://자기:8443/metrics`, 기록 `https://자기:4318/api/v1/write` |
 | Alertmanager | 9093 | 상대 vmalert 는 `:7443/am` 으로 들어온다 |
 | vmauth 자체 | 8427 | vmauth 의 상태 · 지표 · 재적재. 바깥 포트에서는 열지 않는다 |
@@ -472,10 +478,10 @@
 
 | 흐름 | 지나가는 길 |
 |---|---|
-| 에이전트 → 저장소 | 에이전트 → 노드 A `:4318` (vmauth) → `127.0.0.1:8429` vmagent → ① `127.0.0.1:8428` VictoriaMetrics, ② 노드 B `:7443/vm` → B 의 `127.0.0.1:8428` |
+| 에이전트 → 저장소 | 에이전트 → 노드 A `:4318` (vmauth) → `127.0.0.1:8429` vmagent → ① `127.0.0.1:8480` vminsert → A 의 vmstorage, ② 노드 B `:7443/vminsert` → B 의 `127.0.0.1:8480` vminsert → B 의 vmstorage |
 | 노드 A 의 중계가 죽었을 때 | 에이전트 → 노드 A `:4318` → (로컬 vmagent 가 없음) → 노드 B `:7443/vmagent` → B 의 vmagent → 양쪽 저장소 |
 | 노드 A 가 통째로 죽었을 때 | 에이전트가 다음 주소(노드 B `:4318`)로 보낸다. B 의 중계는 A 몫을 디스크 큐에 쌓는다 |
-| 관리 서버 → 조회 | 노드 A `:8443/metrics/...` → 앞부분을 떼고 `127.0.0.1:8428`. 로컬 저장소가 죽었으면 노드 B `:7443/vm` |
+| 관리 서버 → 조회 | 노드 A `:8443/metrics/...` → 앞부분을 떼고 `127.0.0.1:8481/select/0/prometheus` (vmselect) → A · B 의 vmstorage `:8401` 을 합쳐 읽는다. A 의 vmselect 가 죽었으면 노드 B `:7443/vm` (B 의 vmselect) |
 | vmalert | 데이터소스 `:8443/metrics`(로그 규칙은 `/metrics/select/logsql/` 이 VictoriaLogs 로), 기록 `:4318/api/v1/write`, 알림 `127.0.0.1:9093` 과 노드 B `:7443/am` |
 | Alertmanager 끼리 | 노드 IP `:9094` (TCP · UDP) 로 상태를 맞춰 같은 알림을 한 번만 보낸다 |
 
@@ -483,11 +489,11 @@
 
 ### 5.2 8443 과 7443 은 각각 무엇을 하나
 
-**8443 (조회 입구)**: vmauth 가 조회 토큰을 확인하고, 경로 앞부분으로 저장소를 고르고, 앞부분을 떼고 노드 안의 `127.0.0.1` 저장소로 넘긴다. 로컬 저장소가 죽어 있으면 같은 요청을 상대 노드 `:7443/vm` 등으로 넘긴다.
+**8443 (조회 입구)**: vmauth 가 조회 토큰을 확인하고, 경로 앞부분으로 저장소를 고르고, 앞부분을 떼고 노드 안의 `127.0.0.1` 조회 부품으로 넘긴다. 로컬 조회 부품이 죽어 있으면 같은 요청을 상대 노드 `:7443/vm` 등으로 넘긴다.
 
 | 들어온 경로 | 넘기는 곳 | 실제로 가는 경로 |
 |---|---|---|
-| `/metrics/api/v1/query?...` | VictoriaMetrics `127.0.0.1:8428` | `/api/v1/query?...` |
+| `/metrics/api/v1/query?...` | vmselect `127.0.0.1:8481` | `/select/0/prometheus/api/v1/query?...` (`0` 은 클러스터판의 테넌트 번호, 하나만 쓴다) |
 | `/logs/select/logsql/query?...` | VictoriaLogs `127.0.0.1:9428` | `/select/logsql/query?...` |
 | `/traces/select/jaeger/api/...` | VictoriaTraces `127.0.0.1:10428` | `/select/jaeger/api/...` |
 | `/metrics/select/logsql/...` | VictoriaLogs | vmalert 가 데이터소스 주소를 `/metrics` 하나로 쓰기 때문에 둔 예외 |
@@ -496,20 +502,22 @@
 
 | 누가 부르나 | 왜 | 경로 → 받는 부품 |
 |---|---|---|
-| 상대 노드의 중계(vmagent · vlagent · vtagent) | **평소 복제.** 같은 데이터를 이 노드 저장소에도 쓴다 | `/vm/api/v1/write` → VictoriaMetrics, `/vl/insert/native` → VictoriaLogs, `/vt/insert/native` → VictoriaTraces |
+| 상대 노드의 중계(vmagent · vlagent · vtagent) | **평소 복제.** 같은 데이터를 이 노드 저장소에도 쓴다 | `/vminsert/insert/0/prometheus/api/v1/write` → vminsert, `/vl/insert/native` → VictoriaLogs, `/vt/insert/native` → VictoriaTraces |
 | 상대 노드의 vmauth :4318 | 상대 노드의 중계가 죽었을 때 수집 예비 | `/vmagent/...` · `/vlagent/...` · `/vtagent/...` → 이 노드의 중계 |
-| 상대 노드의 vmauth :8443 | 상대 노드의 저장소가 죽었을 때 조회 예비 | `/vm/...` · `/vl/...` · `/vt/...` → 이 노드의 저장소 |
+| 상대 노드의 vmauth :8443 | 상대 노드의 조회 부품이 죽었을 때 조회 예비 | `/vm/...` → 이 노드의 vmselect, `/vl/...` · `/vt/...` → 이 노드의 저장소 |
+| 상대 노드의 주기 대조 · 과거 메트릭 복사 | 이 노드 vmstorage 에만 있는 샘플을 세고 가져가기 | `/vmlocal/...` → 이 노드의 vmselect-local (이 노드 vmstorage 만 읽는다) |
 | 상대 노드의 vmalert | 알림을 두 Alertmanager 에 모두 보내기 | `/am/api/v2/alerts` → 이 노드의 Alertmanager |
 
 ### 5.3 평소 복제는 누가 하나
 
 **저장소가 하는 것이 아니다. 중계 에이전트가 한다.**
 
-- 두 노드의 VictoriaMetrics · VictoriaLogs · VictoriaTraces 는 서로를 모른다. 클러스터로 묶지 않은 단일 노드판이고, 저장소끼리 데이터를 주고받지 않는다.
+- 두 노드의 저장소끼리 데이터를 주고받지 않는다. VictoriaLogs · VictoriaTraces 는 단일 노드판이다. 메트릭은 클러스터판 부품이지만 vminsert 가 로컬 vmstorage 에만 쓴다.
 - 데이터를 처음 받은 노드의 중계가 같은 데이터를 **두 번 보낸다.** 한 번은 자기 노드 저장소(`127.0.0.1`)로, 한 번은 상대 노드 `:7443` 을 거쳐 상대 저장소로 보낸다. vmagent 라면 `-remoteWrite.url` 을 두 개 주는 것이 전부다.
 - 목적지마다 디스크 큐가 따로 있어서, 상대 노드가 죽어 있으면 그쪽 몫만 쌓아 두었다가 돌아오면 보낸다 (7절).
 - 그래서 "양쪽이 같다" 는 보장은 중계와 그 큐에서 나온다. 저장소 쪽에서 맞춰 주는 것은 없다. 큐 한도를 넘는 장애는 사람이 보충해야 하는 이유다.
 - 저장소 클러스터의 복제 기능(VictoriaMetrics 클러스터의 `replicationFactor`)을 쓰지 않은 이유는 3.1절에 있다. 로그 · 트레이스는 저장소 쪽 복제 기능이 없어서, 세 신호를 같은 방식으로 맞추려면 중계가 맡아야 한다.
+- **메트릭 조회만 두 노드를 합친다.** 노드마다 vmselect 가 자기 vmstorage 와 상대 노드 vmstorage(`:8401`)를 함께 읽고, 같은 시계열의 겹친 샘플을 하나로 합친다(`-dedup.minScrapeInterval=1ms`). 그래서 큐 한도를 넘어 한쪽에만 빈 구간이 생겨도 다른 쪽에 있으면 조회에는 드러나지 않는다. 상대 저장소가 죽어 있으면 남은 쪽으로 답하고 `isPartial: true` 를 붙인다. 로그 · 트레이스는 합쳐 읽지 않는다 (VictoriaLogs 의 vlselect 는 같은 줄을 가진 두 저장소를 합치면 두 번 돌려준다, 2026-11-12 로컬 실측).
 
 ### 5.4 HTTPS 와 토큰
 
@@ -528,7 +536,7 @@
 |---|---|---|
 | 없음 | 에이전트 · 앱 · 기존 Prometheus | 수집 경로만 |
 | 조회 토큰 | 관리 서버, vmalert | `/metrics` · `/logs` · `/traces` |
-| 노드 사이 토큰 | 두 노드의 중계 · vmalert · vmauth | `/vm` · `/vl` · `/vt` · `/vmagent` · `/vlagent` · `/vtagent` · `/am` |
+| 노드 사이 토큰 | 두 노드의 중계 · vmalert · vmauth · 주기 대조 | `/vm` · `/vmlocal` · `/vminsert` · `/vl` · `/vt` · `/vmagent` · `/vlagent` · `/vtagent` · `/am` |
 
 - 토큰이 없으면 노드 사이 경로로 저장소에 바로 써서 복제를 건너뛸 수 있다. 토큰이 이것을 막는다.
 - 중계는 목적지가 둘(로컬 · 상대)이라 토큰 · TLS 옵션을 목적지 순서대로 준다 (`-remoteWrite.bearerTokenFile=,<토큰 파일>`: 로컬은 비우고 상대에만).
@@ -566,8 +574,8 @@
 │   ├── tls/                 ca.pem · server.pem · server.key
 │   └── tokens/              peer.token · query.token
 ├── data/
-│   ├── victoria-metrics/    저장소 데이터
-│   ├── victoria-logs/
+│   ├── vmstorage/           메트릭 저장소 데이터
+│   ├── victoria-logs/       로그 · 트레이스 저장소 데이터
 │   ├── victoria-traces/
 │   ├── vmagent-queue/       중계 디스크 큐 (목적지별: 1_ 로컬, 2_ 상대 노드)
 │   ├── vlagent-queue/
@@ -593,8 +601,9 @@
 | 중계 목적지 (`remoteWrite_url`) | 로컬 저장소 하나 | 로컬 + 상대 노드 |
 | vmauth 경로 | 수집 · 조회만 | 수집 · 조회 · 노드 사이 |
 | Alertmanager | 클러스터 없음 | 두 대 클러스터 |
-| 주기 대조 컨테이너 | 띄우지 않음 | 띄움 (compose 프로필 `ha`) |
-| 바깥 포트 | 4318 · 8443 | 4318 · 8443 · 7443 · 9094 |
+| 메트릭 조회 (vmselect) | 로컬 vmstorage 만 | 두 노드 vmstorage 를 합쳐 읽음 |
+| 주기 대조 · vmselect-local 컨테이너 | 띄우지 않음 | 띄움 (compose 프로필 `ha`) |
+| 바깥 포트 | 4318 · 8443 | 4318 · 8443 · 7443 · 9094, 8401 (상대 노드에만) |
 
 - **단일 → 이중화**: 상대 노드를 정해 두 노드에 다시 설치한다. 새 노드에는 그 시점부터 데이터가 쌓인다. 과거 메트릭은 `vmctl` 로 기존 노드에서 복사한다(`poc/bin/backfill-metrics.sh`). 로그 · 트레이스의 과거 데이터 복사는 아직 정하지 않았다. 다 채울 때까지 새 노드에는 조회를 보내지 않는다.
 - **이중화 → 단일**: 상대 노드 없이 남길 노드에 다시 설치한다. 설치가 컨테이너를 모두 내렸다가 다시 만들고, 그 사이 상대 노드로 보내던 큐(`2_` 로 시작)를 지운다. 빠지는 노드는 지우기 스크립트로 정리한다.
@@ -612,7 +621,7 @@
 | ② 노드 A 장애 | A 로 시작한 에이전트가 목록의 다음 주소(B)로 보낸다. 끊기는 시간은 요청 시간 초과 + 재시도 (PoC 에서 시간 초과 5초일 때 약 14초). 그동안 에이전트 디스크 큐가 받는다 | B 만 기록. B 의 중계가 A 몫을 큐에 쌓음 | B 만 | A 복구 후 큐가 비는 것만 확인 |
 | ③ 노드 사이 단절 | 각자 받는다. VIP 가 없으니 split-brain 이 없다 | 각자 상대 몫을 큐에 쌓음. 단절 동안 두 저장소가 잠시 다르다 | 한 노드에 고정 | 연결 복구 후 큐 확인 |
 | ④ 노드 A 의 중계만 죽음 | 에이전트는 모른다. A 의 vmauth 가 B 의 중계로 보낸다 | B 의 중계가 양쪽에 계속 기록 | 영향 없음 | 프로세스 재시작 |
-| ⑤ 저장소만 죽음 | 영향 없음 | 양쪽 중계가 그 저장소 몫을 큐에 쌓음 | 그 노드 vmauth 가 상대 저장소로 | 저장소 재시작 |
+| ⑤ 저장소만 죽음 | 영향 없음 | 양쪽 중계가 그 저장소 몫을 큐에 쌓음 | 메트릭은 두 vmselect 가 남은 vmstorage 로 답한다(`isPartial: true`). 로그 · 트레이스는 그 노드 vmauth 가 상대 저장소로 | 저장소 재시작 |
 | ⑥ vmalert · Alertmanager 한쪽 | 영향 없음 | 영향 없음 | 영향 없음 | 남은 쪽이 같은 규칙으로 알림을 계속 보낸다 |
 
 ---
@@ -625,7 +634,7 @@
 |---|---|---|
 | 장애가 큐 한도 안 | 복구되면 자동으로 채워진다 | 없음. 큐가 0 이 된 뒤 조회에 다시 넣는다 |
 | 노드가 갑자기 죽어 그 노드에서만 몇 초가 빠짐 | 상대 노드에는 있다. 큐로는 채워지지 않는다 (7.1) | 주기 대조로 상대 노드에서 복사한다 (7.2) |
-| 장애가 큐 한도를 넘음 | 가장 오래된 것부터 버려져 빈 구간이 생긴다 | 메트릭은 `vmctl` 로 살아 있던 쪽의 그 구간을 복사한다. 로그 · 트레이스는 살아 있던 쪽에서 export 해 다시 넣는다 (절차는 PoC 에서 확정) |
+| 장애가 큐 한도를 넘음 | 가장 오래된 것부터 버려져 빈 구간이 생긴다. 메트릭은 조회 때 다른 노드 사본으로 메워 보인다 (5.3) | 메트릭은 주기 대조(7.2)가 살아 있던 쪽의 그 구간을 복사한다. 로그 · 트레이스는 살아 있던 쪽에서 export 해 다시 넣는다 (절차는 PoC 에서 확정) |
 
 ### 7.1 갑자기 죽었을 때 잃는 것
 
@@ -639,7 +648,7 @@
 | 노드 B VM 강제 재시작 (compose 설치에서 다시) | 23,600 | 23,600 | 22,700 | B 저장소가 디스크에 아직 안 쓴 9초치(B 만). 양쪽에서 함께 잃은 것은 없었다. 주기 대조(7.2)가 5분 안에 메웠다 |
 
 - 받았다고 응답한 뒤 중계가 디스크 큐에 넣기 전까지(`-remoteWrite.flushInterval`, 기본 1초)의 데이터는 **양쪽에서 함께 잃는다.** 보낸 쪽은 이미 응답을 받았으므로 다시 보내지 않는다. 서버 쪽 어떤 동기화로도 되살릴 수 없다.
-- 저장소가 디스크에 쓰기 전(`-inmemoryDataFlushInterval`, 기본 5초)의 데이터는 **그 노드에서만** 잃는다. 상대 노드에는 있으므로 복사해서 메울 수 있지만, 지금 구조에서는 자동으로 메워지지 않는다.
+- 저장소가 디스크에 쓰기 전(`-inmemoryDataFlushInterval`, 기본 5초)의 데이터는 **그 노드에서만** 잃는다. 상대 노드에는 있으므로 메트릭은 조회 때 합쳐 읽혀 보이고, 주기 대조(7.2)가 사본을 채운다.
 - 에이전트는 노드 B 가 꺼진 뒤 약 14초 안에 A 로 바꿔 보냈고, 실패로 끝난 전송은 없었다.
 - `systemctl stop` 같은 정상 종료(시험 2 · 4)에서는 잃은 것이 없었다.
 - 양쪽에서 함께 잃는 1초치는 에이전트가 한 곳에만 보내는 구조를 고르며 안고 가는 손실이다(3.11). 한 노드에서만 빠진 분량은 7.2 의 주기 대조로 메운다.
@@ -650,16 +659,17 @@
 
 | 단계 | 메트릭 | 로그 · 트레이스 |
 |---|---|---|
-| 1. 비교 | 몇 분마다, 몇 분 전까지의 구간을 1분 단위 샘플 수로 로컬과 상대 노드(`:7443/vm`)를 비교한다 | 1분 단위 건수(LogsQL `stats count()`)를 비교한다 |
-| 2. 복사 | 상대 쪽이 많은 분만 `vmctl vm-native` 로 상대 노드에서 로컬로 복사한다 (`:7443/vm`, HTTPS · 노드 사이 토큰) | 상대 쪽이 많은 분을 상대 노드에서 내보내 로컬에 넣는다 |
+| 1. 비교 | 몇 분마다, 몇 분 전까지의 구간을 1분 단위 샘플 수로 로컬 vmstorage 와 상대 노드 vmstorage 를 비교한다. 노드별 수는 한 vmstorage 만 읽는 vmselect-local 로 센다 (로컬 `127.0.0.1:8491`, 상대 `:7443/vmlocal`) | 1분 단위 건수(LogsQL `stats count()`)를 비교한다 |
+| 2. 복사 | 상대 쪽이 많은 분만 `vmctl vm-native` 로 상대 노드(`:7443/vmlocal`, HTTPS · 노드 사이 토큰)에서 로컬 vminsert(`127.0.0.1:8480/insert/0/prometheus`)로 복사한다 | 상대 쪽이 많은 분을 상대 노드에서 내보내 로컬에 넣는다 |
 | 3. 겹침 | 겹쳐 복사해도 같은 샘플은 하나로 합친다 (`-dedup.minScrapeInterval`) | **중복 제거가 없다.** 겹친 분을 통째로 넣으면 같은 로그가 두 번 남는다. 그 분을 지우고 넣을지, 빠진 줄만 골라 넣을지는 확인 필요 |
 
-- 새 포트나 부품은 없다. 비교 · 복사는 이미 있는 노드 사이 입구(`:7443`)로 한다.
-- 빈틈은 다음 대조 때까지 남는다.
-- **PoC 결과**: 노드 B 의 VictoriaMetrics 를 `kill -9` 하자 3분 구간에서 B 만 6,195 샘플이 적었다(A 123,017 · B 116,822). 대조를 한 번 돌리자 빠진 1분만 복사했고(0.57초) 두 노드 모두 123,017 이 됐다 (`poc/checks/reconcile-test.sh`).
+- 조회는 vmselect 가 두 노드를 합쳐 읽어 빈틈이 드러나지 않으므로, 대조는 노드 하나를 통째로 잃어도 남은 노드에 다 있게 사본을 맞추는 일이다. 비교 · 복사는 노드 사이 입구(`:7443`)로 한다. 합쳐 읽는 `/vm` 으로 세면 상대 쪽 수에 내 사본이 섞이므로 `/vmlocal` 을 따로 둔다.
+- 사본의 빈틈은 다음 대조 때까지 남는다.
+- **PoC 결과** (단일판 VictoriaMetrics 때): 노드 B 의 VictoriaMetrics 를 `kill -9` 하자 3분 구간에서 B 만 6,195 샘플이 적었다(A 123,017 · B 116,822). 대조를 한 번 돌리자 빠진 1분만 복사했고(0.57초) 두 노드 모두 123,017 이 됐다 (`poc/checks/reconcile-test.sh`).
 - 비교 쿼리는 1분마다 전체 시계열의 샘플 수를 센다(`sum(count_over_time({__name__=~".+"}[60s]))`). 시계열이 많아지면 무거워진다. 규모가 커지면 비교 단위를 바꿔야 한다 (확인 필요).
 - vmctl 에 노드 사이 토큰을 명령줄 인자로 넘기므로 복사하는 몇 초 동안 노드의 프로세스 목록에 보인다. 노드에 접속할 수 있는 사람만 볼 수 있다.
-- 조회할 때 두 노드를 합쳐 읽어 바로 메우는 방법(VictoriaMetrics 클러스터판 vmselect)도 있지만, 노드 사이에 평문 포트(8401)가 하나 더 생기고 vmauth 를 거치지 못해 고르지 않았다(바이너리 도움말에 이 연결의 TLS 옵션이 없다).
+- 같은 스크립트를 vmselect-local · vminsert 경로로 바꾼 뒤 로컬 docker 에서 돌렸다(2026-11-12): B 에만 4분이 빈 구간(B 270 · A 342 샘플)에서 빠진 5분을 복사했고 B 도 342 가 됐다. 합쳐 읽는 vmselect 는 그동안 계속 342 였다 (겹쳐 넣은 샘플이 둘로 세지지 않았다).
+- **조회 때 합쳐 읽기(vmselect)를 고른 이유와 8401 대응**: 처음에는 노드 사이에 평문 포트(8401)가 하나 더 생기고 vmauth 를 거치지 못해 고르지 않았다(바이너리 도움말에 이 연결의 TLS 옵션이 없다). 그런데 주기 대조만으로는 로컬 저장소가 살아 있는 한 조회 입구가 로컬만 보므로, 큐 한도를 넘어 빠진 구간이 다음 대조 전까지(대조가 보는 15분보다 오래된 구간은 계속) 빈 채로 응답된다. 그래서 조회는 vmselect 로 두 노드를 합쳐 읽고, 8401 은 이렇게 막는다: 단일 노드면 127.0.0.1 에서만 듣는다. 이중화면 노드 IP 에서 듣되 설치가 firewalld rich rule 로 상대 노드 IP 출발지만 받는다 (firewalld 가 꺼져 있으면 경고를 내고, 다른 방화벽 · 보안그룹에서 같은 제한을 건다). 8401 의 TLS 는 오픈소스판에 없어 노드 사이 구간이 엿보일 수 있다는 점은 남는다.
 
 **큐 한도 정하기**: `-remoteWrite.maxDiskUsagePerURL` 를 목적지마다 준다. **목표는 최소 하루치.** 하루 유입량은 PoC 에서 재서 정한다.
 
@@ -1234,14 +1244,15 @@ users:
         load_balancing_policy: first_available    # 로컬 먼저, 죽으면 다음
         retry_status_codes: [502, 503, 504]
         headers: ["Authorization: Bearer <노드 사이 토큰>"]   # 상대 노드로 넘길 때 쓴다
-        url_prefix: ["http://127.0.0.1:8428", "https://<상대>:7443/vm"]
+        url_prefix: ["http://127.0.0.1:8481/select/0/prometheus", "https://<상대>:7443/vm"]   # vmselect
       # /metrics/select/logsql/.* (먼저), /logs/.*, /traces/.* 도 같은 모양
   - name: peer                                    # 노드 사이 토큰
     bearer_token: "<노드 사이 토큰>"
     url_map:
       - src_paths: ["/vm/.*"]
         drop_src_path_prefix_parts: 1
-        url_prefix: ["http://127.0.0.1:8428"]
+        url_prefix: ["http://127.0.0.1:8481/select/0/prometheus"]
+      # /vmlocal (127.0.0.1:8491/select/0/prometheus), /vminsert (127.0.0.1:8480),
       # /vl, /vt, /vmagent, /vlagent, /vtagent, /am 도 같은 모양
 unauthorized_user:                                # 토큰 없음 = 수집
   url_map:
@@ -1264,13 +1275,13 @@ vmauth -auth.config=/cmp-mon/conf/gateway.yml \
 
 ```sh
 vmagent  -httpListenAddr=127.0.0.1:8429 \
-         -remoteWrite.url=http://127.0.0.1:8428/api/v1/write \
-         -remoteWrite.url=https://<상대>:7443/vm/api/v1/write \
+         -remoteWrite.url=http://127.0.0.1:8480/insert/0/prometheus/api/v1/write \
+         -remoteWrite.url=https://<상대>:7443/vminsert/insert/0/prometheus/api/v1/write \
          -remoteWrite.bearerTokenFile=,/cmp-mon/conf/tokens/peer.token \   # 목적지 순서대로: 로컬은 비움
          -remoteWrite.tlsInsecureSkipVerify=false,true \
          -remoteWrite.tmpDataPath=/cmp-mon/data/vmagent-queue \
          -remoteWrite.maxDiskUsagePerURL=<PoC 실측 후> \
-         -opentelemetry.usePrometheusNaming
+         -opentelemetry.usePrometheusNaming=true \                     # OTEL_PROMETHEUS_NAMING
 # vlagent (/vl/insert/native), vtagent (/vt/insert/native) 도 같은 모양
 ```
 

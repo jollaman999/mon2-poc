@@ -23,19 +23,57 @@ x-common: &common
     nofile: 1048576
 
 services:
-  victoria-metrics:
+  # 메트릭 저장은 클러스터판 세 부품으로 나눈다. vminsert 는 로컬 vmstorage 에만 쓰고(상대 노드 사본은 vmagent 가
+  # 상대 노드 vminsert 로 보낸다), vmselect 는 양쪽 vmstorage 를 합쳐 읽어 한쪽의 빈 구간을 다른 쪽 사본으로 메운다.
+  # env: vmstorage 의 vmselectAddr(단일 127.0.0.1:8401, 이중화 SELF:8401), vmselect 의 storageNode(이중화면 상대 노드까지)
+  vmstorage:
     <<: *common
-    image: docker.io/victoriametrics/victoria-metrics:${VM_VERSION}
-    container_name: ${NAME}-victoria-metrics
+    image: docker.io/victoriametrics/vmstorage:${VM_VERSION}-cluster
+    container_name: ${NAME}-vmstorage
+    env_file: env/vmstorage.env
     command:
-      - -httpListenAddr=127.0.0.1:8428
-      - -storageDataPath=${BASE_DIR}/data/victoria-metrics
+      - -envflag.enable
+      - -httpListenAddr=127.0.0.1:8482
+      - -vminsertAddr=127.0.0.1:8400
+      - -storageDataPath=${BASE_DIR}/data/vmstorage
       - -retentionPeriod=${RETENTION}
       - -dedup.minScrapeInterval=1ms
-      - -opentelemetry.usePrometheusNaming
     volumes:
-      - ${BASE_DIR}/data/victoria-metrics:${BASE_DIR}/data/victoria-metrics:z
-    logging: {driver: k8s-file, options: {path: "${BASE_DIR}/logs/victoria-metrics.log", max-size: 50m}}
+      - ${BASE_DIR}/data/vmstorage:${BASE_DIR}/data/vmstorage:z
+    logging: {driver: k8s-file, options: {path: "${BASE_DIR}/logs/vmstorage.log", max-size: 50m}}
+
+  vminsert:
+    <<: *common
+    image: docker.io/victoriametrics/vminsert:${VM_VERSION}-cluster
+    container_name: ${NAME}-vminsert
+    command:
+      - -httpListenAddr=127.0.0.1:8480
+      - -storageNode=127.0.0.1:8400
+    logging: {driver: k8s-file, options: {path: "${BASE_DIR}/logs/vminsert.log", max-size: 50m}}
+
+  # 조회 · vmalert 용. 저장 노드 하나가 죽어도 남은 쪽으로 답한다 (부분 응답 허용, 응답에 isPartial 표시)
+  vmselect:
+    <<: *common
+    image: docker.io/victoriametrics/vmselect:${VM_VERSION}-cluster
+    container_name: ${NAME}-vmselect
+    env_file: env/vmselect.env
+    command:
+      - -envflag.enable
+      - -httpListenAddr=127.0.0.1:8481
+      - -dedup.minScrapeInterval=1ms
+    logging: {driver: k8s-file, options: {path: "${BASE_DIR}/logs/vmselect.log", max-size: 50m}}
+
+  # 로컬 vmstorage 만 읽는 vmselect (이중화일 때만, --profile ha). 주기 대조가 노드별 샘플 수를 세는 데 쓴다
+  vmselect-local:
+    <<: *common
+    image: docker.io/victoriametrics/vmselect:${VM_VERSION}-cluster
+    container_name: ${NAME}-vmselect-local
+    profiles: [ha]
+    command:
+      - -httpListenAddr=127.0.0.1:8491
+      - -storageNode=${SELF}:8401
+      - -dedup.minScrapeInterval=1ms
+    logging: {driver: k8s-file, options: {path: "${BASE_DIR}/logs/vmselect-local.log", max-size: 50m}}
 
   victoria-logs:
     <<: *common
@@ -62,6 +100,7 @@ services:
     logging: {driver: k8s-file, options: {path: "${BASE_DIR}/logs/victoria-traces.log", max-size: 50m}}
 
   # 중계 3종: 목적지(remoteWrite.url, env)는 1 = 로컬 저장소(http), 2 = 상대 노드 :7443 (이중화일 때만)
+  # vmagent 의 메트릭 이름 바꾸기는 OTEL_PROMETHEUS_NAMING (true 면 system.cpu.time → system_cpu_time_seconds_total)
   vmagent:
     <<: *common
     image: docker.io/victoriametrics/vmagent:${VM_VERSION}
@@ -72,7 +111,7 @@ services:
       - -httpListenAddr=127.0.0.1:8429
       - -remoteWrite.tmpDataPath=${BASE_DIR}/data/vmagent-queue
       - -remoteWrite.maxDiskUsagePerURL=${QUEUE_MAX}
-      - -opentelemetry.usePrometheusNaming
+      - -opentelemetry.usePrometheusNaming=${OTEL_PROMETHEUS_NAMING}
       - -promscrape.config=${BASE_DIR}/conf/scrape.yml
     volumes:
       - ${BASE_DIR}/conf:${BASE_DIR}/conf:ro,z

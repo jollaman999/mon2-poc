@@ -9,7 +9,9 @@ out=dist/images
 mkdir -p "$out"
 
 images=(
-  "victoriametrics/victoria-metrics:$VM_VERSION"
+  "victoriametrics/vmstorage:$VM_VERSION-cluster"
+  "victoriametrics/vminsert:$VM_VERSION-cluster"
+  "victoriametrics/vmselect:$VM_VERSION-cluster"
   "victoriametrics/vmagent:$VM_VERSION"
   "victoriametrics/vmalert:$VM_VERSION"
   "victoriametrics/vmauth:$VM_VERSION"

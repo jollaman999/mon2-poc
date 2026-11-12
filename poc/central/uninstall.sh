@@ -26,7 +26,16 @@ if [ "${ENABLED_PODMAN_RESTART:-0}" = 1 ]; then
   echo "podman-restart.service 끔"
 fi
 
-images=("victoriametrics/victoria-metrics:$VM_VERSION" "victoriametrics/vmagent:$VM_VERSION"
+# 앞선 설치가 연 vmstorage 8401 rich rule (상대 노드 출발지만)을 지운다. 포트 4318 등은 다른 것도 쓸 수 있어 남긴다
+if [ -n "${FW_8401_PEER:-}" ] && systemctl is-active --quiet firewalld; then
+  fam=ipv4; case "$FW_8401_PEER" in *:*) fam=ipv6 ;; esac
+  firewall-cmd --permanent --remove-rich-rule="rule family=\"$fam\" source address=\"$FW_8401_PEER\" port port=\"8401\" protocol=\"tcp\" accept" >/dev/null 2>&1 || true
+  firewall-cmd --reload >/dev/null
+  echo "방화벽 8401 (출발지 $FW_8401_PEER) 규칙 삭제"
+fi
+
+images=("victoriametrics/vmstorage:$VM_VERSION-cluster" "victoriametrics/vminsert:$VM_VERSION-cluster"
+        "victoriametrics/vmselect:$VM_VERSION-cluster" "victoriametrics/vmagent:$VM_VERSION"
         "victoriametrics/vmalert:$VM_VERSION" "victoriametrics/vmauth:$VM_VERSION" "victoriametrics/vmctl:$VM_VERSION"
         "victoriametrics/victoria-logs:$VL_VERSION" "victoriametrics/vlagent:$VL_VERSION"
         "victoriametrics/victoria-traces:$VT_VERSION" "victoriametrics/vtagent:$VT_VERSION"

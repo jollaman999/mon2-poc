@@ -1,8 +1,10 @@
 #!/bin/sh
 # 주기 대조 (메트릭). 설계 문서 7.2.
-# 몇 분 전까지의 구간을 1분씩 나눠 로컬과 상대 노드의 샘플 수를 비교하고,
-# 상대 쪽이 많은 분만 상대 노드(:7443/vm)에서 로컬로 복사한다.
-# 겹쳐 복사한 샘플은 VictoriaMetrics 의 -dedup.minScrapeInterval 로 하나로 합쳐진다.
+# 몇 분 전까지의 구간을 1분씩 나눠 로컬과 상대 노드 vmstorage 의 샘플 수를 비교하고,
+# 상대 쪽이 많은 분만 상대 노드에서 로컬 vminsert 로 복사한다.
+# 조회(vmselect)는 두 노드를 합쳐 읽어 빈 구간이 보이지 않지만, 노드 하나를 통째로 잃어도 남은 노드에 다 있게 사본을 맞춘다.
+# 노드별 수는 한 vmstorage 만 읽는 vmselect-local 로 센다 (로컬 127.0.0.1:8491, 상대 :7443/vmlocal).
+# 겹쳐 복사한 샘플은 -dedup.minScrapeInterval 로 하나로 합쳐진다.
 # 두 노드가 각자 돌리므로 어느 쪽이 빠졌든 빠진 쪽이 채운다.
 #
 # compose 의 reconcile 컨테이너(공식 vmctl 이미지)에서 돈다. 이 이미지는 Alpine 이라 bash · curl 이 없어서
@@ -29,9 +31,9 @@ case "${TLS_VERIFY:-skip}" in
 esac
 # sum(count_over_time({__name__=~".+"}[60s])) 를 URL 인코딩한 것 (busybox 에 인코더가 없다)
 q='sum%28count_over_time%28%7B__name__%3D~%22.%2B%22%7D%5B60s%5D%29%29'
-local_q() { wget -q -T 20 -O- --post-data "query=$q&time=$1" http://127.0.0.1:8428/api/v1/query; }
+local_q() { wget -q -T 20 -O- --post-data "query=$q&time=$1" http://127.0.0.1:8491/select/0/prometheus/api/v1/query; }
 peer_q()  { wget -q -T 20 -O- "$wget_tls" --header "Authorization: Bearer $tok" --post-data "query=$q&time=$1" \
-              "https://$PEER:7443/vm/api/v1/query"; }
+              "https://$PEER:7443/vmlocal/api/v1/query"; }
 num() { grep -oE '"value":\[[0-9.]+,"[0-9]+"' | grep -oE '"[0-9]+"$' | tr -d '"' || true; }
 hm() { date -u -d "@$1" +%H:%M:%SZ; }
 
@@ -45,9 +47,9 @@ while [ "$m" -lt "$last" ]; do
   l=${l:-0}; checked=$(( checked + 1 ))
   if [ "$p" -gt "$l" ]; then
     echo "$(hm "$m")~$(hm "$end") 로컬 $l < 상대 $p: 상대에서 복사"
-    /vmctl-prod vm-native -s --vm-native-src-addr="https://$PEER:7443/vm" \
+    /vmctl-prod vm-native -s --vm-native-src-addr="https://$PEER:7443/vmlocal" \
       --vm-native-src-bearer-token="$tok" "$vmctl_tls" \
-      --vm-native-dst-addr=http://127.0.0.1:8428 \
+      --vm-native-dst-addr=http://127.0.0.1:8480/insert/0/prometheus \
       --vm-native-filter-match='{__name__=~".+"}' \
       --vm-native-filter-time-start="$(date -u -d "@$m" +%Y-%m-%dT%H:%M:%SZ)" \
       --vm-native-filter-time-end="$(date -u -d "@$end" +%Y-%m-%dT%H:%M:%SZ)" >/dev/null

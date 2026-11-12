@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# 중앙 노드 하나에 Victoria 3종 · 중계 3종 · vmalert · Alertmanager · vmauth 입구를 컨테이너로 띄운다 (Podman + podman-compose).
+# 중앙 노드 하나에 Victoria 저장소(메트릭은 vmstorage · vminsert · vmselect) · 중계 3종 · vmalert · Alertmanager · vmauth 입구를
+# 컨테이너로 띄운다 (Podman + podman-compose).
 # deploy-central.sh 가 묶음(bundle)을 올린 뒤 그 안에서 root 로 실행한다. 인터넷에 나가지 않는다.
 #
 # node.env 로 받는 값
@@ -10,6 +11,7 @@
 #   RETENTION QUEUE_MAX WEBHOOK
 #   TLS_VERIFY                상대 노드 HTTPS 인증서를 skip(기본, 검증 안 함) / ca(묶음의 사설 CA 로 검증)
 #   AM_LOG_LEVEL              Alertmanager 로그 수준 (기본 info, 원인 추적 때 debug)
+#   OTEL_PROMETHEUS_NAMING    true(기본)면 vmagent 가 OTLP 메트릭 이름을 Prometheus 꼴로 바꿔 저장한다, false 면 받은 이름 그대로
 # 묶음 안
 #   podman-el10/rpms · whl    Podman RPM(EL10) 과 podman-compose wheel (bin/fetch-podman.sh)
 #   images/*.tar              공식 이미지 (bin/fetch-images.sh)
@@ -27,6 +29,8 @@ DATA_DIR=$BASE_DIR/data
 LOG_DIR=$BASE_DIR/logs
 if [ -n "${PEER:-}" ]; then MODE=ha; else MODE=single; fi
 TLS_VERIFY=${TLS_VERIFY:-skip}
+OTEL_PROMETHEUS_NAMING=${OTEL_PROMETHEUS_NAMING:-true}
+case "$OTEL_PROMETHEUS_NAMING" in true|false) ;; *) echo "OTEL_PROMETHEUS_NAMING 은 true 또는 false: $OTEL_PROMETHEUS_NAMING" >&2; exit 1 ;; esac
 PC=/usr/local/bin/podman-compose
 
 [ "$(id -u)" = 0 ] || { echo "root 로 실행해야 한다" >&2; exit 1; }
@@ -75,7 +79,7 @@ install -d -m 0750 "$COMPOSE_DIR"
 install -d -m 0750 -o root -g "$SVC_GID" "$CONF_DIR" "$CONF_DIR/rules" "$CONF_DIR/tls" "$CONF_DIR/tokens"
 install -d -m 0750 -o "$SVC_UID" -g "$SVC_GID" "$DATA_DIR" "$LOG_DIR"
 # 컨테이너가 서비스 계정 uid 로 쓰므로 데이터 폴더 소유를 맞춘다 (앞선 설치가 남긴 것도 같은 계정이면 그대로다)
-for d in victoria-metrics victoria-logs victoria-traces vmagent-queue vlagent-queue vtagent-queue alertmanager; do
+for d in vmstorage victoria-logs victoria-traces vmagent-queue vlagent-queue vtagent-queue alertmanager; do
   install -d -m 0750 -o "$SVC_UID" -g "$SVC_GID" "$DATA_DIR/$d"
 done
 chown -R "$SVC_UID:$SVC_GID" "$DATA_DIR"
@@ -110,9 +114,19 @@ relay_env() { # 로컬 URL, 상대 노드 경로 → 중계 목적지 1 = 로컬
     echo "remoteWrite_url=$1"
   fi
 }
-relay_env http://127.0.0.1:8428/api/v1/write /vm/api/v1/write > "$COMPOSE_DIR/env/vmagent.env"
+relay_env http://127.0.0.1:8480/insert/0/prometheus/api/v1/write /vminsert/insert/0/prometheus/api/v1/write \
+  > "$COMPOSE_DIR/env/vmagent.env"
 relay_env http://127.0.0.1:9428/insert/native /vl/insert/native > "$COMPOSE_DIR/env/vlagent.env"
 relay_env http://127.0.0.1:10428/insert/native /vt/insert/native > "$COMPOSE_DIR/env/vtagent.env"
+# 메트릭 저장소: 이중화면 vmstorage 가 상대 노드 vmselect 의 연결(8401, 평문 · 인증 없음)을 받아야 해서 노드 IP 로 듣고,
+# vmselect 는 두 노드 vmstorage 를 합쳐 읽는다. 8401 은 방화벽에서 상대 노드에만 연다 ([8/8])
+if [ "$MODE" = ha ]; then
+  echo "vmselectAddr=$SELF:8401" > "$COMPOSE_DIR/env/vmstorage.env"
+  echo "storageNode=$SELF:8401,$PEER:8401" > "$COMPOSE_DIR/env/vmselect.env"
+else
+  echo "vmselectAddr=127.0.0.1:8401" > "$COMPOSE_DIR/env/vmstorage.env"
+  echo "storageNode=127.0.0.1:8401" > "$COMPOSE_DIR/env/vmselect.env"
+fi
 { # vmalert: 조회 · 기록은 자기 입구(HTTPS), 알림은 1 = 로컬 Alertmanager, 2 = 상대 노드 :7443/am
   echo "datasource_$SELF_TLS"; echo "remoteRead_$SELF_TLS"; echo "remoteWrite_$SELF_TLS"
   if [ "$MODE" = ha ]; then
@@ -155,6 +169,7 @@ VL_VERSION=$VL_VERSION
 VT_VERSION=$VT_VERSION
 AM_VERSION=$AM_VERSION
 AM_LOG_LEVEL=${AM_LOG_LEVEL:-info}
+OTEL_PROMETHEUS_NAMING=$OTEL_PROMETHEUS_NAMING
 MODE=$MODE
 SELF=$SELF
 PEER=${PEER:-}
@@ -171,7 +186,10 @@ sed "s|@SELF@|$SELF|" conf/scrape.yml > "$CONF_DIR/scrape.yml"
 ./gen-gateway.sh "$CONF_DIR/gateway.yml" "${PEER:-}" "$(cat secrets/peer.token)" "$(cat secrets/query.token)"
 # 서비스 계정이 설정을 읽을 수 있게 그룹을 맞춘다 (쓰기는 root 만)
 chgrp -R "$SVC_GID" "$CONF_DIR"; chmod -R g+rX,o-rwx "$CONF_DIR"
-# 지울 때 쓰려고 설치 정보를 남긴다
+# 지울 때 쓰려고 설치 정보를 남긴다. FW_8401_PEER 는 앞선 설치가 8401 을 열어 준 상대 노드 (다시 설치할 때 지운다)
+prev_fw_peer=$( [ -f "$CONF_DIR/install.env" ] && sed -n 's/^FW_8401_PEER=//p' "$CONF_DIR/install.env" || true )
+fw_peer=""
+if [ "$MODE" = ha ] && systemctl is-active --quiet firewalld; then fw_peer=$PEER; fi
 restart_enabled=$( [ -f "$CONF_DIR/install.env" ] && sed -n 's/^ENABLED_PODMAN_RESTART=//p' "$CONF_DIR/install.env" || true )
 if [ -z "$restart_enabled" ]; then
   if systemctl is-enabled --quiet podman-restart.service 2>/dev/null; then restart_enabled=0; else restart_enabled=1; fi
@@ -182,6 +200,7 @@ SERVICE_USER=$SERVICE_USER
 BASE_DIR=$BASE_DIR
 CREATED_USER=${created_user:-0}
 ENABLED_PODMAN_RESTART=$restart_enabled
+FW_8401_PEER=$fw_peer
 VM_VERSION=$VM_VERSION
 VL_VERSION=$VL_VERSION
 VT_VERSION=$VT_VERSION
@@ -214,12 +233,20 @@ systemctl enable podman-restart.service >/dev/null 2>&1
 systemctl is-enabled podman-restart.service
 
 echo "[8/8] 방화벽"
+# vmstorage 8401 은 상대 노드 출발지만 받는 rich rule 로 연다
+rule_8401() { local fam=ipv4; case "$1" in *:*) fam=ipv6 ;; esac
+  echo "rule family=\"$fam\" source address=\"$1\" port port=\"8401\" protocol=\"tcp\" accept"; }
 if systemctl is-active --quiet firewalld; then
   ports="4318 8443"; [ "$MODE" = ha ] && ports="$ports 7443 9094"
   for p in $ports; do firewall-cmd --permanent --add-port="$p/tcp" >/dev/null; done
   [ "$MODE" = ha ] && firewall-cmd --permanent --add-port=9094/udp >/dev/null
+  [ -n "$prev_fw_peer" ] && firewall-cmd --permanent --remove-rich-rule="$(rule_8401 "$prev_fw_peer")" >/dev/null 2>&1 || true
+  [ -n "$fw_peer" ] && firewall-cmd --permanent --add-rich-rule="$(rule_8401 "$fw_peer")" >/dev/null
   firewall-cmd --reload
 else
   echo "firewalld 꺼짐"
+  if [ "$MODE" = ha ]; then
+    echo "경고: vmstorage 의 8401/tcp(평문, 인증 없음)가 $SELF 에서 듣는다. 다른 방화벽 · 보안그룹에서 8401 을 상대 노드 $PEER 에만 열 것" >&2
+  fi
 fi
 echo "설치 끝: $SELF ($MODE, 상대 ${PEER:-없음})"

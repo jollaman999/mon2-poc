@@ -32,9 +32,9 @@ log() { echo "[$(date +%T)] $*"; }
 otlp_rows() { on "$1" "curl -s http://127.0.0.1:8429/metrics | awk '/^vmagent_rows_inserted_total\\{type=\"opentelemetry\"\\}/ {print \$NF}'"; }
 host_name=$(on_agent hostname)
 series="system_memory_usage_bytes{state=\"used\",host_name=\"$host_name\"}"
-samples() { # 노드 시작epoch 끝epoch → 그 구간의 샘플 수 (1초 간격이면 초 수와 같아야 한다)
+samples() { # 노드 시작epoch 끝epoch → 그 노드 vmstorage 의 그 구간 샘플 수 (vmselect-local, 1초 간격이면 초 수와 같아야 한다)
   local secs=$(( $3 - $2 ))
-  on "$1" "curl -s http://127.0.0.1:8428/api/v1/query --data-urlencode 'query=count_over_time(${series}[${secs}s])' --data-urlencode time=$3" |
+  on "$1" "curl -s http://127.0.0.1:8491/select/0/prometheus/api/v1/query --data-urlencode 'query=count_over_time(${series}[${secs}s])' --data-urlencode time=$3" |
     python3 -c 'import json,sys; r=json.load(sys.stdin)["data"]["result"]; print(r[0]["value"][1] if r else 0)'
 }
 

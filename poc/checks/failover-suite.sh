@@ -40,11 +40,11 @@ for t in $tests; do
     ;;
   2)
     log "== 시험 2: 노드 B 의 컨테이너를 모두 정지 (3분)"
-    $F stop B gateway vmalert alertmanager vmagent vlagent vtagent victoria-metrics victoria-logs victoria-traces >/dev/null
+    $F stop B gateway vmalert alertmanager vmagent vlagent vtagent vmselect-local vmselect vminsert vmstorage victoria-logs victoria-traces >/dev/null
     sleep 180
     log "A 조회 (조회 토큰): $(on "$NODE_A" "curl -sk -o /dev/null -w '%{http_code}' -H \"Authorization: Bearer \$(sudo cat $BASE/conf/tokens/query.token)\" https://$NODE_A:8443/metrics/api/v1/query?query=up")"
     log "A 의 B 몫 큐: $(queue_sum "$NODE_A") 바이트"
-    $F start B victoria-metrics victoria-logs victoria-traces vmagent vlagent vtagent alertmanager gateway vmalert >/dev/null
+    $F start B vmstorage vminsert vmselect vmselect-local victoria-logs victoria-traces vmagent vlagent vtagent alertmanager gateway vmalert >/dev/null
     wait_queue_zero "$NODE_A" 300 || true
     sleep 60
     $F count 8m

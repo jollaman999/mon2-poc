@@ -18,8 +18,8 @@ ssh_opts=(-n -i "$SSH_KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTime
 on() { local h=$1; shift; timeout 120 ssh "${ssh_opts[@]}" "$SSH_USER@$h" "$@"; }
 jump() { timeout $(( secs + 120 )) ssh -n -o ConnectTimeout=10 "$JUMP" "$@"; }
 log() { echo "[$(date +%T)] $*"; }
-count() { # 노드 → run 의 샘플 수 (vmauth 를 거치지 않고 로컬 저장소에 직접)
-  on "$1" "curl -s http://127.0.0.1:8428/api/v1/query --data-urlencode 'query=sum(count_over_time(poc_load{run=\"$run\"}[30m]))'" |
+count() { # 노드 → run 의 샘플 수 (vmauth 를 거치지 않고 그 노드 vmstorage 만 읽는 vmselect-local 에 직접)
+  on "$1" "curl -s http://127.0.0.1:8491/select/0/prometheus/api/v1/query --data-urlencode 'query=sum(count_over_time(poc_load{run=\"$run\"}[30m]))'" |
     python3 -c 'import json,sys; r=json.load(sys.stdin)["data"]["result"]; print(r[0]["value"][1] if r else 0)'
 }
 queue() { on "$1" "curl -s http://127.0.0.1:8429/metrics | awk '/^vmagent_remotewrite_pending_data_bytes/ {s+=\$NF} END {printf \"%d\", s}'"; }
@@ -49,8 +49,8 @@ wait "$load_pid" || true
 cat "$out"
 result=$(tail -1 "$out"); rm -f "$out"
 if [ "$mode" = node ]; then
-  up() { on "$NODE_B" "sudo podman ps --filter name=^$NAME- --filter status=running --format '{{.Names}}' | grep -cE '$NAME-(victoria-metrics|vmagent|gateway)\$'"; }
-  for _ in $(seq 1 60); do [ "$(up 2>/dev/null)" = 3 ] && break; sleep 10; done
+  up() { on "$NODE_B" "sudo podman ps --filter name=^$NAME- --filter status=running --format '{{.Names}}' | grep -cE '$NAME-(vmstorage|vminsert|vmselect-local|vmagent|gateway)\$'"; }
+  for _ in $(seq 1 60); do [ "$(up 2>/dev/null)" = 5 ] && break; sleep 10; done
   log "노드 B 컨테이너: $(on "$NODE_B" "sudo podman ps -a --filter name=^$NAME- --format '{{.Names}}={{.Status}}' | tr '\n' ' '")"
 fi
 for _ in $(seq 1 60); do
